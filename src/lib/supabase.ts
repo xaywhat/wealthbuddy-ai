@@ -377,16 +377,54 @@ export class DatabaseService {
     newCategory: string,
     updateReason: 'manual' | 'rule' | 'bulk' = 'manual'
   ): Promise<void> {
-    // Use the database function for proper audit trail
-    const { error } = await supabaseAdmin.rpc('update_transaction_category', {
-      p_transaction_id: transactionId,
-      p_user_id: userId,
-      p_new_category: newCategory,
-      p_update_reason: updateReason,
-    });
+    try {
+      // First, get the current transaction to check ownership and get old category
+      const { data: transaction, error: fetchError } = await supabaseAdmin
+        .from('transactions')
+        .select(`
+          *,
+          accounts!inner(user_id)
+        `)
+        .eq('id', transactionId)
+        .eq('accounts.user_id', userId)
+        .single();
 
-    if (error) {
-      throw new Error(`Failed to update transaction category: ${error.message}`);
+      if (fetchError) {
+        throw new Error(`Transaction not found or access denied: ${fetchError.message}`);
+      }
+
+      const oldCategory = transaction.user_category || transaction.category;
+
+      // Update the transaction's user_category
+      const { error: updateError } = await supabaseAdmin
+        .from('transactions')
+        .update({
+          user_category: newCategory,
+          category_source: updateReason
+        })
+        .eq('id', transactionId);
+
+      if (updateError) {
+        throw new Error(`Failed to update transaction: ${updateError.message}`);
+      }
+
+      // Create audit trail entry
+      const { error: auditError } = await supabaseAdmin
+        .from('transaction_category_updates')
+        .insert({
+          transaction_id: transactionId,
+          user_id: userId,
+          old_category: oldCategory,
+          new_category: newCategory,
+          update_reason: updateReason
+        });
+
+      if (auditError) {
+        console.warn('Failed to create audit trail:', auditError.message);
+        // Don't throw error for audit trail failure
+      }
+    } catch (error) {
+      throw new Error(`Failed to update transaction category: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -402,16 +440,82 @@ export class DatabaseService {
   }
 
   static async applyCategorizationRules(userId: string): Promise<number> {
-    // Use the database function to apply rules to existing transactions
-    const { data, error } = await supabaseAdmin.rpc('apply_categorization_rules', {
-      p_user_id: userId,
-    });
+    try {
+      // Get all categorization rules for the user
+      const rules = await this.getCategorizationRules(userId);
+      
+      if (rules.length === 0) {
+        return 0;
+      }
 
-    if (error) {
-      throw new Error(`Failed to apply categorization rules: ${error.message}`);
+      // Get all transactions for the user that don't have user_category set
+      const { data: transactions, error: fetchError } = await supabaseAdmin
+        .from('transactions')
+        .select(`
+          *,
+          accounts!inner(user_id)
+        `)
+        .eq('accounts.user_id', userId)
+        .is('user_category', null);
+
+      if (fetchError) {
+        throw new Error(`Failed to fetch transactions: ${fetchError.message}`);
+      }
+
+      let updatedCount = 0;
+
+      // Apply rules to each transaction
+      for (const transaction of transactions || []) {
+        const description = transaction.description?.toLowerCase() || '';
+        const creditorName = transaction.creditor_name?.toLowerCase() || '';
+        const debtorName = transaction.debtor_name?.toLowerCase() || '';
+        
+        // Find the first matching rule (rules are ordered by priority)
+        for (const rule of rules) {
+          const keyword = rule.keyword.toLowerCase();
+          let matches = false;
+
+          const textToCheck = `${description} ${creditorName} ${debtorName}`;
+
+          switch (rule.rule_type) {
+            case 'contains':
+              matches = textToCheck.includes(keyword);
+              break;
+            case 'starts_with':
+              matches = description.startsWith(keyword) || 
+                       creditorName.startsWith(keyword) || 
+                       debtorName.startsWith(keyword);
+              break;
+            case 'ends_with':
+              matches = description.endsWith(keyword) || 
+                       creditorName.endsWith(keyword) || 
+                       debtorName.endsWith(keyword);
+              break;
+            case 'exact':
+              matches = description === keyword || 
+                       creditorName === keyword || 
+                       debtorName === keyword;
+              break;
+          }
+
+          if (matches) {
+            // Update the transaction with the rule's category
+            await this.updateTransactionCategory(
+              transaction.id,
+              userId,
+              rule.category,
+              'rule'
+            );
+            updatedCount++;
+            break; // Stop checking other rules for this transaction
+          }
+        }
+      }
+
+      return updatedCount;
+    } catch (error) {
+      throw new Error(`Failed to apply categorization rules: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    return data || 0;
   }
 
   static async getTransactionCategoryUpdates(userId: string, limit: number = 100): Promise<TransactionCategoryUpdate[]> {
