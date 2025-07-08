@@ -7,14 +7,25 @@ The app shows "NEXTAUTH_URL not configured" error when trying to connect a bank 
 The code was incorrectly using `NEXTAUTH_URL` environment variable to construct callback URLs for Nordigen bank connections, even though the app doesn't use NextAuth.js.
 
 ## Solution Applied
-Updated the code to use Vercel's automatic `VERCEL_URL` environment variable with fallbacks:
+Updated both the connect and callback routes to use Vercel's automatic `VERCEL_URL` environment variable with fallbacks:
 
+**In `/src/app/api/nordigen/connect/route.ts`:**
 ```typescript
 // Get the base URL for callbacks - use VERCEL_URL on Vercel, fallback to NEXTAUTH_URL or localhost
 const baseUrl = process.env.VERCEL_URL 
   ? `https://${process.env.VERCEL_URL}`
   : process.env.NEXTAUTH_URL || 'http://localhost:3000';
 ```
+
+**In `/src/app/api/nordigen/callback/route.ts`:**
+```typescript
+// Get the base URL for redirects - use VERCEL_URL on Vercel, fallback to NEXTAUTH_URL or localhost
+const baseUrl = process.env.VERCEL_URL 
+  ? `https://${process.env.VERCEL_URL}`
+  : process.env.NEXTAUTH_URL || 'http://localhost:3000';
+```
+
+This ensures both the initial bank connection and the callback redirect use the correct URLs.
 
 ## Vercel Environment Variables Setup
 

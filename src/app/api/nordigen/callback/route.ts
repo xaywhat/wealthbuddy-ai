@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import nordigenClient from '@/lib/nordigen';
 
 export async function GET(request: NextRequest) {
-  // Get the base URL for redirects - use VERCEL_URL on Vercel, fallback to NEXTAUTH_URL or localhost
-  const baseUrl = process.env.VERCEL_URL 
-    ? `https://${process.env.VERCEL_URL}`
+  // Get the base URL for redirects - hardcode production URL, fallback to localhost for development
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? 'https://wealthbuddy-ai.vercel.app'
     : process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
   try {
