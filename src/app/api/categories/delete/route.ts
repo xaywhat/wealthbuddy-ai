@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { DatabaseService } from '@/lib/supabase';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -14,57 +14,58 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // First get the account IDs for this user
-    const { data: userAccounts, error: accountsError } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('user_id', userId);
+    // Get all transactions for this user with this category
+    const transactions = await DatabaseService.getTransactions(userId);
+    const transactionsToUpdate = transactions.filter(tx => 
+      DatabaseService.getEffectiveCategory(tx) === category
+    );
 
-    if (accountsError) {
-      console.error('Error fetching user accounts:', accountsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch user accounts' },
-        { status: 500 }
-      );
-    }
-
-    const accountIds = userAccounts?.map(acc => acc.id) || [];
-
-    // Update all transactions with this category to be uncategorized
-    const { data: updatedTransactions, error: updateError } = await supabase
-      .from('transactions')
-      .update({ 
-        user_category: null,
-        category_source: null 
-      })
-      .eq('user_category', category)
-      .in('account_id', accountIds)
-      .select('id');
-
-    if (updateError) {
-      console.error('Error updating transactions:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to update transactions' },
-        { status: 500 }
-      );
+    // Update each transaction to remove the category
+    let updatedCount = 0;
+    for (const transaction of transactionsToUpdate) {
+      try {
+        await DatabaseService.updateTransactionCategory(
+          transaction.id,
+          userId,
+          'Uncategorized',
+          'manual'
+        );
+        updatedCount++;
+      } catch (error) {
+        console.error(`Failed to update transaction ${transaction.id}:`, error);
+      }
     }
 
     // Also delete any categorization rules for this category
-    const { error: rulesError } = await supabase
-      .from('categorization_rules')
-      .delete()
-      .eq('user_id', userId)
-      .eq('category', category);
-
-    if (rulesError) {
-      console.error('Error deleting rules:', rulesError);
+    try {
+      const rules = await DatabaseService.getCategorizationRules(userId);
+      const rulesToDelete = rules.filter(rule => rule.category === category);
+      
+      for (const rule of rulesToDelete) {
+        await DatabaseService.deleteCategorizationRule(rule.id);
+      }
+    } catch (error) {
+      console.error('Error deleting categorization rules:', error);
       // Don't fail the request if rules deletion fails
+    }
+
+    // Also delete any internal transfer rules for this category
+    try {
+      const transferRules = await DatabaseService.getInternalTransferRules(userId);
+      const transferRulesToDelete = transferRules.filter(rule => rule.category === category);
+      
+      for (const rule of transferRulesToDelete) {
+        await DatabaseService.deleteInternalTransferRule(rule.id);
+      }
+    } catch (error) {
+      console.error('Error deleting internal transfer rules:', error);
+      // Don't fail the request if transfer rules deletion fails
     }
 
     return NextResponse.json({
       success: true,
-      updatedTransactions: updatedTransactions?.length || 0,
-      message: `Category "${category}" deleted and ${updatedTransactions?.length || 0} transactions marked as uncategorized`
+      updatedTransactions: updatedCount,
+      message: `Category "${category}" deleted and ${updatedCount} transactions marked as uncategorized`
     });
 
   } catch (error) {

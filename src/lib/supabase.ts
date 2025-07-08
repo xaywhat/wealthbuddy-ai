@@ -74,6 +74,17 @@ export interface TransactionCategoryUpdate {
   created_at: string;
 }
 
+export interface InternalTransferRule {
+  id: string;
+  user_id: string;
+  from_account_id: string;
+  to_account_id: string;
+  category: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SyncLog {
   id: string;
   user_id: string;
@@ -570,5 +581,154 @@ export class DatabaseService {
     });
 
     return Array.from(categories).sort();
+  }
+
+  // Internal transfer rules management
+  static async getInternalTransferRules(userId: string): Promise<InternalTransferRule[]> {
+    const { data, error } = await supabaseAdmin
+      .from('internal_transfer_rules')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to get internal transfer rules: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  static async createInternalTransferRule(
+    userId: string,
+    fromAccountId: string,
+    toAccountId: string,
+    category: string,
+    description?: string
+  ): Promise<InternalTransferRule> {
+    const { data, error } = await supabaseAdmin
+      .from('internal_transfer_rules')
+      .insert({
+        user_id: userId,
+        from_account_id: fromAccountId,
+        to_account_id: toAccountId,
+        category,
+        description,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to create internal transfer rule: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  static async updateInternalTransferRule(
+    ruleId: string,
+    updates: Partial<Pick<InternalTransferRule, 'category' | 'description'>>
+  ): Promise<InternalTransferRule> {
+    const { data, error } = await supabaseAdmin
+      .from('internal_transfer_rules')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', ruleId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to update internal transfer rule: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  static async deleteInternalTransferRule(ruleId: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('internal_transfer_rules')
+      .delete()
+      .eq('id', ruleId);
+
+    if (error) {
+      throw new Error(`Failed to delete internal transfer rule: ${error.message}`);
+    }
+  }
+
+  // Detect and categorize internal transfers
+  static async detectInternalTransfers(userId: string): Promise<number> {
+    try {
+      // Get all internal transfer rules for the user
+      const rules = await this.getInternalTransferRules(userId);
+      
+      if (rules.length === 0) {
+        return 0;
+      }
+
+      // Get user's accounts
+      const accounts = await this.getAccounts(userId);
+      const accountMap = new Map(accounts.map(acc => [acc.id, acc]));
+
+      let updatedCount = 0;
+
+      // Check each rule
+      for (const rule of rules) {
+        // Find transactions that match this internal transfer pattern
+        const { data: transactions, error: fetchError } = await supabaseAdmin
+          .from('transactions')
+          .select(`
+            *,
+            accounts!inner(user_id)
+          `)
+          .eq('accounts.user_id', userId)
+          .eq('account_id', rule.from_account_id)
+          .lt('amount', 0) // Outgoing transaction
+          .is('user_category', null); // Not manually categorized
+
+        if (fetchError) {
+          console.error('Error fetching transactions for internal transfer detection:', fetchError);
+          continue;
+        }
+
+        // For each outgoing transaction, look for matching incoming transaction
+        for (const outgoingTx of transactions || []) {
+          const { data: incomingTx, error: incomingError } = await supabaseAdmin
+            .from('transactions')
+            .select(`
+              *,
+              accounts!inner(user_id)
+            `)
+            .eq('accounts.user_id', userId)
+            .eq('account_id', rule.to_account_id)
+            .eq('amount', Math.abs(outgoingTx.amount)) // Matching positive amount
+            .eq('date', outgoingTx.date) // Same date
+            .single();
+
+          if (!incomingError && incomingTx) {
+            // Found matching internal transfer - categorize both transactions
+            await this.updateTransactionCategory(
+              outgoingTx.id,
+              userId,
+              rule.category,
+              'rule'
+            );
+
+            await this.updateTransactionCategory(
+              incomingTx.id,
+              userId,
+              rule.category,
+              'rule'
+            );
+
+            updatedCount += 2;
+          }
+        }
+      }
+
+      return updatedCount;
+    } catch (error) {
+      throw new Error(`Failed to detect internal transfers: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }
