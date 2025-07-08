@@ -1,7 +1,7 @@
 // Configuration for different environments
 export const config = {
   // Production API URL - Update this when you deploy your backend
-  productionApiUrl: 'wealthbuddy-ai.vercel.app', // Update this URL
+  productionApiUrl: 'https://wealthbuddy-ai.vercel.app', // Update this URL
   
   // For mobile builds, we need to point to the production API
   isMobile: typeof window !== 'undefined' && window.location.protocol === 'capacitor:',

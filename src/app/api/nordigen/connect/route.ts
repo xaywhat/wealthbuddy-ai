@@ -22,16 +22,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!process.env.NEXTAUTH_URL) {
-      console.error('Missing NEXTAUTH_URL');
+    // Get the base URL for callbacks - use VERCEL_URL on Vercel, fallback to NEXTAUTH_URL or localhost
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXTAUTH_URL || 'http://localhost:3000';
+
+    if (!baseUrl) {
+      console.error('Missing base URL configuration');
       return NextResponse.json(
-        { error: 'NEXTAUTH_URL not configured. Please check your .env.local file.' },
+        { error: 'Base URL not configured. Please check your environment variables.' },
         { status: 500 }
       );
     }
 
     const institutionId = DANISH_BANKS[bankId as BankId];
-    const redirectUrl = `${process.env.NEXTAUTH_URL}/api/nordigen/callback`;
+    const redirectUrl = `${baseUrl}/api/nordigen/callback`;
     const reference = `wealthbuddy-${Date.now()}`;
 
     console.log('Creating requisition with:', {
