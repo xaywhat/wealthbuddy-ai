@@ -21,7 +21,7 @@ set /p COUNTRY=Enter your country code (e.g., DK for Denmark):
 echo.
 echo Generating keystore...
 
-keytool -genkeypair -v -keystore android\%KEYSTORE_NAME% -name %KEY_ALIAS% -keyalg RSA -keysize 2048 -validity 10000 -storepass %STORE_PASSWORD% -keypass %KEY_PASSWORD% -dname "CN=%FIRST_LAST_NAME%, OU=%ORG_UNIT%, O=%ORG_NAME%, L=%CITY%, S=%STATE%, C=%COUNTRY%"
+keytool -genkeypair -v -keystore android\%KEYSTORE_NAME% -alias %KEY_ALIAS% -keyalg RSA -keysize 2048 -validity 10000 -storepass %STORE_PASSWORD% -keypass %KEY_PASSWORD% -dname "CN=%FIRST_LAST_NAME%, OU=%ORG_UNIT%, O=%ORG_NAME%, L=%CITY%, S=%STATE%, C=%COUNTRY%"
 
 if %ERRORLEVEL% EQU 0 (
     echo.
