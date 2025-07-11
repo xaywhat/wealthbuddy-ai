@@ -487,16 +487,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 z-30">
         <div className="flex justify-around items-center">
           <Link
-            href="/"
-            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
-              pathname === '/' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <span className="text-xl">🏠</span>
-            <span className="text-xs font-medium">Home</span>
-          </Link>
-          
-          <Link
             href="/budgets"
             className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
               pathname === '/budgets' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900'
@@ -504,6 +494,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             <span className="text-xl">🎯</span>
             <span className="text-xs font-medium">Budgets</span>
+          </Link>
+
+          <Link
+            href="/goals"
+            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
+              pathname === '/goals' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <span className="text-xl">🏆</span>
+            <span className="text-xs font-medium">Goals</span>
+          </Link>
+
+          <Link
+            href="/"
+            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
+              pathname === '/' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <span className="text-xl">🏠</span>
+            <span className="text-xs font-medium">Home</span>
           </Link>
 
           <Link
@@ -524,16 +534,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             <span className="text-xl">💳</span>
             <span className="text-xs font-medium">Transactions</span>
-          </Link>
-
-          <Link
-            href="/goals"
-            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
-              pathname === '/goals' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <span className="text-xl">🏆</span>
-            <span className="text-xs font-medium">Goals</span>
           </Link>
         </div>
       </nav>

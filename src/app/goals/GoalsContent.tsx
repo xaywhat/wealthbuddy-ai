@@ -232,16 +232,14 @@ export default function GoalsContent() {
         },
         body: JSON.stringify({
           userId: user.id,
-          action: 'create',
           goal: {
-            title: newGoal.title,
+            name: newGoal.title,
             description: newGoal.description || null,
-            targetAmount: parseFloat(newGoal.targetAmount),
-            targetDate: newGoal.targetDate,
-            goalType: newGoal.goalType,
+            target_amount: parseFloat(newGoal.targetAmount),
+            target_date: newGoal.targetDate,
+            goal_type: newGoal.goalType,
             category: newGoal.category || null,
-            priority: newGoal.priority,
-            autoCalculate: newGoal.autoCalculate
+            priority: newGoal.priority
           }
         }),
       });

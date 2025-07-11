@@ -213,12 +213,12 @@ export default function BudgetsContent() {
         },
         body: JSON.stringify({
           userId: user.id,
-          action: 'create',
           budget: {
+            name: `${newBudget.category} Budget`,
             category: newBudget.category,
             amount: parseFloat(newBudget.amount),
-            period: newBudget.period,
-            alertThreshold: parseInt(newBudget.alertThreshold),
+            period_type: newBudget.period,
+            alert_threshold: parseInt(newBudget.alertThreshold) / 100,
             description: newBudget.description || null
           }
         }),

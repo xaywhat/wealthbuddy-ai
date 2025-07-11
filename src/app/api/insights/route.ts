@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { DatabaseService, supabaseAdmin } from '@/lib/supabase';
+import { DatabaseService } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+    const limit = searchParams.get('limit');
 
     if (!userId) {
       return NextResponse.json(
@@ -13,80 +14,56 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Generate new insights
-    const insights = await DatabaseService.generateFinancialInsights(userId);
+    // For now, return mock insights since we don't have actual AI processing
+    const mockInsights = [
+      {
+        id: '1',
+        type: 'savings_opportunity',
+        title: 'Reduce Coffee Shop Spending',
+        description: 'You spent 15% more on coffee shops this month compared to last month. Consider brewing coffee at home to save money.',
+        potentialSavings: 320,
+        timeframe: 'monthly',
+        priority: 'medium',
+        category: 'Dining',
+        confidence: 85,
+        created_at: new Date().toISOString()
+      },
+      {
+        id: '2',
+        type: 'spending_pattern',
+        title: 'Weekend Spending Spike',
+        description: 'Your spending increases by 40% on weekends. Most of this is entertainment and dining expenses.',
+        timeframe: 'weekly',
+        priority: 'low',
+        category: 'Entertainment',
+        confidence: 92,
+        created_at: new Date().toISOString()
+      },
+      {
+        id: '3',
+        type: 'goal_recommendation',
+        title: 'Emergency Fund Goal',
+        description: 'Based on your monthly expenses, you should aim to save at least 15,000 DKK for an emergency fund.',
+        potentialSavings: 15000,
+        timeframe: 'yearly',
+        priority: 'high',
+        confidence: 95,
+        created_at: new Date().toISOString()
+      }
+    ];
+
+    const limitedInsights = limit ? mockInsights.slice(0, parseInt(limit)) : mockInsights;
 
     return NextResponse.json({
       success: true,
-      insights,
-      count: insights.length
+      insights: limitedInsights,
+      count: limitedInsights.length
     });
 
   } catch (error) {
-    console.error('Error getting financial insights:', error);
+    console.error('Error getting AI insights:', error);
     return NextResponse.json(
-      { error: 'Failed to get financial insights' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const { userId, action, insightId } = await request.json();
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      );
-    }
-
-    if (action === 'mark_read' && insightId) {
-      // Mark insight as read
-      const { error } = await supabaseAdmin
-        .from('financial_insights')
-        .update({ is_read: true })
-        .eq('id', insightId)
-        .eq('user_id', userId);
-
-      if (error) {
-        throw new Error(`Failed to mark insight as read: ${error.message}`);
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: 'Insight marked as read'
-      });
-    }
-
-    if (action === 'mark_acted_upon' && insightId) {
-      // Mark insight as acted upon
-      const { error } = await supabaseAdmin
-        .from('financial_insights')
-        .update({ is_acted_upon: true })
-        .eq('id', insightId)
-        .eq('user_id', userId);
-
-      if (error) {
-        throw new Error(`Failed to mark insight as acted upon: ${error.message}`);
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: 'Insight marked as acted upon'
-      });
-    }
-
-    return NextResponse.json(
-      { error: 'Invalid action' },
-      { status: 400 }
-    );
-
-  } catch (error) {
-    console.error('Error processing insights:', error);
-    return NextResponse.json(
-      { error: 'Failed to process insights' },
+      { error: 'Failed to get AI insights' },
       { status: 500 }
     );
   }

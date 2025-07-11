@@ -428,20 +428,6 @@ export default function CategoriesContent() {
             <h1 className="text-2xl font-bold text-gray-900">Categories</h1>
             <p className="text-gray-600">Manage your spending categories and rules</p>
           </div>
-          <div className="flex space-x-2">
-            <select
-              value={selectedPeriod}
-              onChange={(e) => handlePeriodChange(e.target.value)}
-              className="text-sm border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
-            >
-              <option value="all">All Time</option>
-              <option value="this_week">This Week</option>
-              <option value="this_month">This Month</option>
-              <option value="last_month">Last Month</option>
-              <option value="last_3_months">Last 3 Months</option>
-              <option value="custom">Custom Range</option>
-            </select>
-          </div>
         </div>
 
         {/* Custom Date Range */}
@@ -564,8 +550,8 @@ export default function CategoriesContent() {
         )}
 
         {/* Category Overview Grid */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-800">Category Overview</h3>
             <div className="text-sm text-gray-500">
               {selectedPeriod === 'all' ? 'All time' : 
@@ -575,60 +561,62 @@ export default function CategoriesContent() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-3 gap-4 overflow-y-auto">
             {Object.entries(getCategoryTotals())
               .sort(([,a], [,b]) => b.amount - a.amount)
               .map(([category, data]) => (
-                <div key={category} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${getCategoryColor(category)}`}>
-                        <span className="text-lg">{getCategoryIcon(category)}</span>
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">{category}</h4>
-                        <p className="text-sm text-gray-500">{data.count} transactions</p>
-                      </div>
+                <div key={category} className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition-all cursor-pointer">
+                  <div className="text-center space-y-3">
+                    {/* Category Icon */}
+                    <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center ${getCategoryColor(category)}`}>
+                      <span className="text-2xl">{getCategoryIcon(category)}</span>
                     </div>
                     
-                    <div className="text-right">
-                      <p className="text-xl font-bold text-gray-900">
+                    {/* Category Name */}
+                    <div>
+                      <h4 className="font-semibold text-gray-900 text-sm truncate">{category}</h4>
+                      <p className="text-xs text-gray-500">{data.count} transactions</p>
+                    </div>
+                    
+                    {/* Amount */}
+                    <div>
+                      <p className="text-lg font-bold text-gray-900">
                         {formatCurrency(data.amount)}
                       </p>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-sm ${data.trend >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                      <div className="flex items-center justify-center space-x-1">
+                        <span className={`text-xs ${data.trend >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                           {data.trend >= 0 ? '↗' : '↘'} {Math.abs(data.trend).toFixed(1)}%
                         </span>
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* Category Progress Bar */}
-                  <div className="mt-4">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                        style={{ 
-                          width: `${Math.min((data.amount / Math.max(...Object.values(getCategoryTotals()).map(c => c.amount))) * 100, 100)}%` 
-                        }}
-                      />
+                    
+                    {/* Category Progress Bar */}
+                    <div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${Math.min((data.amount / Math.max(...Object.values(getCategoryTotals()).map(c => c.amount))) * 100, 100)}%` 
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Quick Actions for Category */}
-                  <div className="mt-3 flex space-x-2">
-                    <button
-                      onClick={() => router.push(`/transactions?category=${encodeURIComponent(category)}`)}
-                      className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200"
-                    >
-                      View Transactions
-                    </button>
-                    <button
-                      onClick={() => router.push(`/budgets?category=${encodeURIComponent(category)}`)}
-                      className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200"
-                    >
-                      Set Budget
-                    </button>
+                    {/* Quick Actions for Category */}
+                    <div className="flex flex-col space-y-2">
+                      <button
+                        onClick={() => router.push(`/transactions?category=${encodeURIComponent(category)}`)}
+                        className="text-xs bg-blue-100 text-blue-700 py-2 px-3 rounded hover:bg-blue-200 transition-colors"
+                      >
+                        View Transactions
+                      </button>
+                      <button
+                        onClick={() => router.push(`/budgets?add=true&category=${encodeURIComponent(category)}`)}
+                        className="text-xs bg-green-100 text-green-700 py-2 px-3 rounded hover:bg-green-200 transition-colors"
+                      >
+                        Set Budget
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
