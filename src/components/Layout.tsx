@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useTimePeriod } from '@/contexts/TimePeriodContext';
 
 interface User {
   id: string;
@@ -19,15 +20,34 @@ interface Notification {
   created_at: string;
 }
 
+interface FinancialSummary {
+  totalIncome: number;
+  totalExpenses: number;
+  netAmount: number;
+  transactionCount: number;
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showTimePeriodDropdown, setShowTimePeriodDropdown] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
+  const [loadingFinancialSummary, setLoadingFinancialSummary] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const { 
+    selectedPeriod, 
+    customStartDate, 
+    customEndDate, 
+    setSelectedPeriod, 
+    setCustomStartDate, 
+    setCustomEndDate, 
+    getPeriodLabel 
+  } = useTimePeriod();
 
   useEffect(() => {
     const userData = localStorage.getItem('wealthbuddy_user');
@@ -36,8 +56,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       setUser(parsedUser);
       loadNotifications(parsedUser.id);
       checkConnectionStatus(parsedUser.id);
+      loadFinancialSummary(parsedUser.id);
     }
   }, []);
+
+  // Reload financial summary when time period changes
+  useEffect(() => {
+    if (user && isConnected) {
+      loadFinancialSummary(user.id);
+    }
+  }, [selectedPeriod, customStartDate, customEndDate, user, isConnected]);
 
   const loadNotifications = async (userId: string) => {
     try {
@@ -63,6 +91,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Error checking connection status:', error);
+    }
+  };
+
+  const loadFinancialSummary = async (userId: string) => {
+    try {
+      setLoadingFinancialSummary(true);
+      const response = await fetch(`/api/financial-summary?userId=${userId}&period=${selectedPeriod}&startDate=${customStartDate}&endDate=${customEndDate}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setFinancialSummary(data.summary);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading financial summary:', error);
+    } finally {
+      setLoadingFinancialSummary(false);
     }
   };
 
@@ -95,6 +141,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('da-DK', {
+      style: 'currency',
+      currency: 'DKK',
+    }).format(amount);
+  };
+
   const getPageTitle = () => {
     switch (pathname) {
       case '/': return 'Home';
@@ -110,6 +163,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       default: return 'WealthBuddy';
     }
   };
+
+  const handlePeriodChange = (period: string) => {
+    setSelectedPeriod(period);
+    setShowTimePeriodDropdown(false);
+  };
+
+  // Only show financial summary and time selector on main app pages, not on login
+  const shouldShowFinancialSummary = user && isConnected && pathname !== '/login' && pathname !== '/privacy-policy' && pathname !== '/terms-of-service';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -127,6 +188,88 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
           
           <div className="flex items-center space-x-3">
+            {/* Time Period Selector - Only show if user is connected */}
+            {shouldShowFinancialSummary && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowTimePeriodDropdown(!showTimePeriodDropdown)}
+                  className="flex items-center space-x-1 text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors"
+                >
+                  <span>{getPeriodLabel()}</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Time Period Dropdown */}
+                {showTimePeriodDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    <button
+                      onClick={() => handlePeriodChange('this_week')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      This Week
+                    </button>
+                    <button
+                      onClick={() => handlePeriodChange('last_week')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Last Week
+                    </button>
+                    <button
+                      onClick={() => handlePeriodChange('this_month')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      This Month
+                    </button>
+                    <button
+                      onClick={() => handlePeriodChange('last_month')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Last Month
+                    </button>
+                    <button
+                      onClick={() => handlePeriodChange('last_3_months')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Last 3 Months
+                    </button>
+                    <button
+                      onClick={() => handlePeriodChange('last_6_months')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Last 6 Months
+                    </button>
+                    <button
+                      onClick={() => handlePeriodChange('this_year')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      This Year
+                    </button>
+                    <button
+                      onClick={() => handlePeriodChange('last_year')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Last Year
+                    </button>
+                    <button
+                      onClick={() => handlePeriodChange('all')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      All Time
+                    </button>
+                    <div className="border-t border-gray-200 my-1"></div>
+                    <button
+                      onClick={() => handlePeriodChange('custom')}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Custom Range
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Add Button */}
             <div className="relative">
               <button
@@ -250,14 +393,89 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Profile Button */}
-            <Link
-              href="/profile"
-              className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm hover:bg-blue-700 transition-colors"
-            >
-              {user?.keyphrase?.charAt(0).toUpperCase() || 'U'}
-            </Link>
+            {user ? (
+              <Link
+                href="/profile"
+                className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm hover:bg-blue-700 transition-colors"
+              >
+                {user.keyphrase?.charAt(0).toUpperCase() || 'U'}
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="text-sm bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Login
+              </Link>
+            )}
           </div>
         </div>
+
+        {/* Financial Summary Bar */}
+        {shouldShowFinancialSummary && (
+          <div className="mt-3">
+            {loadingFinancialSummary ? (
+              <div className="flex items-center justify-center text-xs bg-gray-50 rounded-lg px-3 py-2">
+                <div className="animate-pulse flex space-x-4 w-full">
+                  <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                </div>
+              </div>
+            ) : financialSummary ? (
+              <div className="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-2">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-1">
+                    <span className="text-green-600">📈</span>
+                    <span className="text-gray-600">Income:</span>
+                    <span className="font-semibold text-green-600">
+                      {formatCurrency(financialSummary.totalIncome)}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-red-600">📉</span>
+                    <span className="text-gray-600">Expenses:</span>
+                    <span className="font-semibold text-red-600">
+                      {formatCurrency(Math.abs(financialSummary.totalExpenses))}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <span className="text-gray-600">Net:</span>
+                  <span className={`font-bold ${financialSummary.netAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(financialSummary.netAmount)}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* Custom Date Range Input */}
+        {shouldShowFinancialSummary && selectedPeriod === 'custom' && (
+          <div className="mt-3 bg-gray-50 rounded-lg px-3 py-2">
+            <div className="flex space-x-3 items-center">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">From</label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">To</label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
@@ -321,12 +539,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Click outside handlers */}
-      {(showNotifications || showAddMenu) && (
+      {(showNotifications || showAddMenu || showTimePeriodDropdown) && (
         <div
           className="fixed inset-0 z-20"
           onClick={() => {
             setShowNotifications(false);
             setShowAddMenu(false);
+            setShowTimePeriodDropdown(false);
           }}
         />
       )}
