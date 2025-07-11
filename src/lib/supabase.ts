@@ -94,6 +94,16 @@ export interface SyncLog {
   created_at: string;
 }
 
+export interface CategoryType {
+  id: string;
+  user_id: string | null;
+  category_name: string;
+  category_type: 'income' | 'expense';
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // Database utility functions
 export class DatabaseService {
   // User management
@@ -549,38 +559,179 @@ export class DatabaseService {
     return transaction.user_category || transaction.category || 'Uncategorized';
   }
 
-  // Get available categories from existing transactions
-  static async getAvailableCategories(userId: string): Promise<string[]> {
+  // Category Types Management
+  static async getCategoryTypes(userId: string): Promise<CategoryType[]> {
     const { data, error } = await supabaseAdmin
-      .from('transactions')
-      .select(`
-        category,
-        user_category,
-        accounts!inner(user_id)
-      `)
-      .eq('accounts.user_id', userId);
+      .from('category_types')
+      .select('*')
+      .or(`user_id.eq.${userId},user_id.is.null`)
+      .order('is_default', { ascending: false })
+      .order('category_name', { ascending: true });
 
     if (error) {
-      throw new Error(`Failed to get available categories: ${error.message}`);
+      throw new Error(`Failed to get category types: ${error.message}`);
     }
 
-    const categories = new Set<string>();
-    
-    // Add default categories
-    const defaultCategories = [
-      'Groceries', 'Transportation', 'Dining', 'Shopping', 'Bills', 
-      'Entertainment', 'Healthcare', 'MobilePay', 'Convenience Store',
-      'Internal Transfer', 'Income', 'Other'
-    ];
-    defaultCategories.forEach(cat => categories.add(cat));
+    return data || [];
+  }
 
-    // Add categories from existing transactions
-    data?.forEach(transaction => {
-      if (transaction.user_category) categories.add(transaction.user_category);
-      if (transaction.category) categories.add(transaction.category);
-    });
+  static async createCategoryType(
+    userId: string,
+    categoryName: string,
+    categoryType: 'income' | 'expense'
+  ): Promise<CategoryType> {
+    const { data, error } = await supabaseAdmin
+      .from('category_types')
+      .insert({
+        user_id: userId,
+        category_name: categoryName,
+        category_type: categoryType,
+        is_default: false,
+      })
+      .select()
+      .single();
 
-    return Array.from(categories).sort();
+    if (error) {
+      throw new Error(`Failed to create category type: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  static async deleteCategoryType(userId: string, categoryName: string): Promise<void> {
+    // Don't allow deletion of default categories
+    const { error } = await supabaseAdmin
+      .from('category_types')
+      .delete()
+      .eq('user_id', userId)
+      .eq('category_name', categoryName)
+      .eq('is_default', false); // Only delete non-default categories
+
+    if (error) {
+      throw new Error(`Failed to delete category type: ${error.message}`);
+    }
+  }
+
+  // Get available categories from existing transactions AND category_types table
+  static async getAvailableCategories(userId: string): Promise<string[]> {
+    try {
+      // Get categories from category_types table (both default and user-specific)
+      const { data: categoryTypes, error: categoryTypesError } = await supabaseAdmin
+        .from('category_types')
+        .select('category_name')
+        .or(`user_id.eq.${userId},user_id.is.null`);
+
+      if (categoryTypesError) {
+        console.warn('Failed to get category types:', categoryTypesError.message);
+      }
+
+      // Get categories from existing transactions
+      const { data: transactions, error: transactionsError } = await supabaseAdmin
+        .from('transactions')
+        .select(`
+          category,
+          user_category,
+          accounts!inner(user_id)
+        `)
+        .eq('accounts.user_id', userId);
+
+      if (transactionsError) {
+        console.warn('Failed to get transaction categories:', transactionsError.message);
+      }
+
+      const categories = new Set<string>();
+      
+      // Add categories from category_types table
+      categoryTypes?.forEach(ct => {
+        if (ct.category_name) categories.add(ct.category_name);
+      });
+
+      // Add categories from existing transactions
+      transactions?.forEach(transaction => {
+        if (transaction.user_category) categories.add(transaction.user_category);
+        if (transaction.category) categories.add(transaction.category);
+      });
+
+      // Ensure we have at least the basic categories
+      const basicCategories = [
+        'Groceries', 'Transportation', 'Dining', 'Shopping', 'Bills', 
+        'Entertainment', 'Healthcare', 'MobilePay', 'Convenience Store',
+        'Internal Transfer', 'Income', 'Uncategorized'
+      ];
+      basicCategories.forEach(cat => categories.add(cat));
+
+      return Array.from(categories).sort();
+    } catch (error) {
+      console.error('Error getting available categories:', error);
+      // Return basic categories as fallback
+      return [
+        'Groceries', 'Transportation', 'Dining', 'Shopping', 'Bills', 
+        'Entertainment', 'Healthcare', 'MobilePay', 'Convenience Store',
+        'Internal Transfer', 'Income', 'Uncategorized'
+      ];
+    }
+  }
+
+  // Delete a category completely (from category_types and update transactions)
+  static async deleteCategory(userId: string, categoryName: string): Promise<number> {
+    try {
+      // Get all transactions for this user with this category
+      const transactions = await this.getTransactions(userId);
+      const transactionsToUpdate = transactions.filter(tx => 
+        this.getEffectiveCategory(tx) === categoryName
+      );
+
+      // Update each transaction to remove the category
+      let updatedCount = 0;
+      for (const transaction of transactionsToUpdate) {
+        try {
+          await this.updateTransactionCategory(
+            transaction.id,
+            userId,
+            'Uncategorized',
+            'manual'
+          );
+          updatedCount++;
+        } catch (error) {
+          console.error(`Failed to update transaction ${transaction.id}:`, error);
+        }
+      }
+
+      // Delete from category_types table (only user-created categories)
+      try {
+        await this.deleteCategoryType(userId, categoryName);
+      } catch (error) {
+        console.warn('Failed to delete from category_types:', error);
+      }
+
+      // Delete any categorization rules for this category
+      try {
+        const rules = await this.getCategorizationRules(userId);
+        const rulesToDelete = rules.filter(rule => rule.category === categoryName);
+        
+        for (const rule of rulesToDelete) {
+          await this.deleteCategorizationRule(rule.id);
+        }
+      } catch (error) {
+        console.warn('Error deleting categorization rules:', error);
+      }
+
+      // Delete any internal transfer rules for this category
+      try {
+        const transferRules = await this.getInternalTransferRules(userId);
+        const transferRulesToDelete = transferRules.filter(rule => rule.category === categoryName);
+        
+        for (const rule of transferRulesToDelete) {
+          await this.deleteInternalTransferRule(rule.id);
+        }
+      } catch (error) {
+        console.warn('Error deleting internal transfer rules:', error);
+      }
+
+      return updatedCount;
+    } catch (error) {
+      throw new Error(`Failed to delete category: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   // Internal transfer rules management

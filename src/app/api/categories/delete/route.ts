@@ -14,53 +14,22 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Get all transactions for this user with this category
-    const transactions = await DatabaseService.getTransactions(userId);
-    const transactionsToUpdate = transactions.filter(tx => 
-      DatabaseService.getEffectiveCategory(tx) === category
-    );
+    // Check if it's a default category that shouldn't be deleted
+    const defaultCategories = [
+      'Groceries', 'Transportation', 'Dining', 'Shopping', 'Bills', 
+      'Entertainment', 'Healthcare', 'MobilePay', 'Convenience Store',
+      'Internal Transfer', 'Income', 'Uncategorized'
+    ];
 
-    // Update each transaction to remove the category
-    let updatedCount = 0;
-    for (const transaction of transactionsToUpdate) {
-      try {
-        await DatabaseService.updateTransactionCategory(
-          transaction.id,
-          userId,
-          'Uncategorized',
-          'manual'
-        );
-        updatedCount++;
-      } catch (error) {
-        console.error(`Failed to update transaction ${transaction.id}:`, error);
-      }
+    if (defaultCategories.includes(category)) {
+      return NextResponse.json(
+        { error: 'Cannot delete default categories' },
+        { status: 400 }
+      );
     }
 
-    // Also delete any categorization rules for this category
-    try {
-      const rules = await DatabaseService.getCategorizationRules(userId);
-      const rulesToDelete = rules.filter(rule => rule.category === category);
-      
-      for (const rule of rulesToDelete) {
-        await DatabaseService.deleteCategorizationRule(rule.id);
-      }
-    } catch (error) {
-      console.error('Error deleting categorization rules:', error);
-      // Don't fail the request if rules deletion fails
-    }
-
-    // Also delete any internal transfer rules for this category
-    try {
-      const transferRules = await DatabaseService.getInternalTransferRules(userId);
-      const transferRulesToDelete = transferRules.filter(rule => rule.category === category);
-      
-      for (const rule of transferRulesToDelete) {
-        await DatabaseService.deleteInternalTransferRule(rule.id);
-      }
-    } catch (error) {
-      console.error('Error deleting internal transfer rules:', error);
-      // Don't fail the request if transfer rules deletion fails
-    }
+    // Use the new DatabaseService method to delete the category
+    const updatedCount = await DatabaseService.deleteCategory(userId, category);
 
     return NextResponse.json({
       success: true,

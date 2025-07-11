@@ -49,29 +49,16 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      // Add to category_types table
-      const { data, error } = await supabaseAdmin
-        .from('category_types')
-        .insert({
-          user_id: userId,
-          category_name: categoryName,
-          category_type: categoryType,
-          is_default: false
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating category:', error);
-        return NextResponse.json(
-          { error: 'Failed to create category' },
-          { status: 500 }
-        );
-      }
+      // Use the new DatabaseService method to create category
+      const categoryData = await DatabaseService.createCategoryType(
+        userId,
+        categoryName,
+        categoryType
+      );
 
       return NextResponse.json({ 
         success: true, 
-        category: data,
+        category: categoryData,
         message: `Category "${categoryName}" created successfully`
       });
 

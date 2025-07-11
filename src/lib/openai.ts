@@ -7,99 +7,190 @@ const openai = new OpenAI({
 
 export default openai;
 
-// AI Analysis functions
+// Enhanced AI Analysis with merchant-specific insights
 export async function analyzeSpendingHabits(transactions: any[]) {
   try {
-    // Limit to recent transactions and reduce data size
-    const recentTransactions = transactions
-      .filter(t => parseFloat(t.transactionAmount?.amount || t.amount) < 0) // Only expenses
-      .slice(0, 100) // Limit to 100 most recent transactions
+    // Process transactions to extract expense data
+    const expenseTransactions = transactions
+      .filter(t => parseFloat(t.amount || t.transactionAmount?.amount || 0) < 0) // Only expenses
       .map(t => ({
-        amount: Math.abs(parseFloat(t.transactionAmount?.amount || t.amount)),
-        description: (t.remittanceInformationUnstructured || t.description || '').substring(0, 50), // Truncate descriptions
-        merchant: (t.creditorName || t.debtorName || 'Unknown').substring(0, 30), // Truncate merchant names
+        amount: Math.abs(parseFloat(t.amount || t.transactionAmount?.amount || 0)),
+        description: (t.description || t.remittanceInformationUnstructured || '').substring(0, 100),
+        merchant: (t.creditor_name || t.creditorName || t.debtor_name || t.debtorName || 'Unknown').substring(0, 50),
+        date: t.date || new Date().toISOString().split('T')[0],
+        category: t.user_category || t.category || 'Uncategorized'
       }));
 
-    // Pre-process data to create summary statistics instead of sending raw transactions
-    const categoryStats = generateCategoryStats(recentTransactions);
-    const totalSpent = recentTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const avgTransaction = totalSpent / recentTransactions.length;
-    const transactionCount = recentTransactions.length;
-
-    const prompt = `You must respond with ONLY valid JSON. No explanatory text before or after.
-
-Analyze this Danish spending data and return ONLY this JSON structure:
-
-Data:
-- Total spent: ${totalSpent.toFixed(2)} DKK
-- Average transaction: ${avgTransaction.toFixed(2)} DKK  
-- Transaction count: ${transactionCount}
-- Categories: ${Object.entries(categoryStats).map(([cat, stats]: [string, any]) => 
-  `${cat}: ${stats.amount.toFixed(2)} DKK (${stats.count} transactions)`
-).join(', ')}
-
-Return ONLY this JSON (no other text):
-{
-  "totalSpent": ${totalSpent},
-  "categories": {
-    ${Object.entries(categoryStats).map(([cat, stats]: [string, any]) => 
-      `"${cat}": {"amount": ${stats.amount.toFixed(2)}, "percentage": ${((stats.amount/totalSpent)*100).toFixed(1)}, "transactions": ${stats.count}}`
-    ).join(',\n    ')}
-  },
-  "insights": [
-    {"type": "savings_opportunity", "title": "Convenience Store Spending", "description": "Consider reducing convenience store visits", "potentialSavings": ${Math.max(100, totalSpent * 0.1)}, "timeframe": "monthly"}
-  ],
-  "recommendations": [
-    {"category": "Convenience Stores", "suggestion": "Shop at supermarkets instead of 7-Eleven", "impact": "medium", "savingsEstimate": ${Math.max(50, totalSpent * 0.05)}}
-  ]
-}`;
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "You are a Danish financial advisor. Analyze spending patterns and provide actionable savings advice."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 2000,
-    });
-
-    const analysisText = completion.choices[0].message.content;
+    // Generate comprehensive analysis
+    const analysis = await generateComprehensiveAnalysis(expenseTransactions);
     
-    // Parse the JSON response with better extraction
-    try {
-      let jsonText = analysisText || '{}';
-      
-      // Try to extract JSON from mixed text response
-      const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        jsonText = jsonMatch[0];
-      }
-      
-      const analysis = JSON.parse(jsonText);
-      
-      // Validate the structure
-      if (!analysis.totalSpent || !analysis.categories) {
-        throw new Error('Invalid analysis structure');
-      }
-      
-      return analysis;
-    } catch (parseError) {
-      console.error('Error parsing AI analysis:', parseError);
-      console.error('Raw response:', analysisText);
-      return generateFallbackAnalysis(transactions);
-    }
+    return analysis;
 
   } catch (error) {
-    console.error('Error with OpenAI analysis:', error);
+    console.error('Error with enhanced AI analysis:', error);
     return generateFallbackAnalysis(transactions);
   }
+}
+
+// Generate comprehensive spending analysis
+async function generateComprehensiveAnalysis(transactions: any[]) {
+  const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
+  const merchantStats = getMerchantStats(transactions);
+  const categoryStats = generateCategoryStats(transactions);
+  const frequencyStats = generateFrequencyStats(transactions);
+  
+  // Generate merchant-specific insights
+  const merchantInsights = generateMerchantInsights(merchantStats, totalSpent);
+  
+  // Generate savings opportunities
+  const savingsOpportunities = generateSavingsOpportunities(merchantStats, categoryStats, totalSpent);
+  
+  // Generate spending pattern insights
+  const spendingPatterns = generateSpendingPatterns(frequencyStats, merchantStats);
+  
+  return {
+    totalSpent,
+    categories: categoryStats,
+    merchantAnalysis: merchantStats,
+    insights: [...merchantInsights, ...spendingPatterns],
+    recommendations: savingsOpportunities
+  };
+}
+
+// Generate merchant-specific insights
+function generateMerchantInsights(merchantStats: any, totalSpent: number) {
+  const insights = [];
+  
+  // Get top merchants by spending
+  const topMerchants = Object.entries(merchantStats)
+    .sort(([,a], [,b]) => (b as any).amount - (a as any).amount)
+    .slice(0, 5);
+  
+  for (const [merchant, stats] of topMerchants) {
+    const merchantData = stats as any;
+    const percentage = (merchantData.amount / totalSpent) * 100;
+    
+    if (percentage > 5) { // Only show insights for merchants with >5% of spending
+      insights.push({
+        type: 'merchant_spending',
+        title: `${merchant} Analysis`,
+        description: `You spent ${merchantData.amount.toFixed(2)} DKK at ${merchant} across ${merchantData.count} transactions this month`,
+        potentialSavings: 0,
+        timeframe: 'monthly',
+        merchant: merchant,
+        amount: merchantData.amount,
+        transactions: merchantData.count
+      });
+    }
+  }
+  
+  return insights;
+}
+
+// Generate specific savings opportunities
+function generateSavingsOpportunities(merchantStats: any, categoryStats: any, totalSpent: number) {
+  const opportunities = [];
+  
+  // Check for 7-Eleven vs supermarket savings
+  const convenience = merchantStats['7-Eleven'] || merchantStats['7-eleven'] || 
+                     Object.entries(merchantStats).find(([name]) => 
+                       name.toLowerCase().includes('7-eleven') || name.toLowerCase().includes('convenience')
+                     )?.[1];
+  
+  if (convenience && (convenience as any).amount > 200) {
+    const convenienceData = convenience as any;
+    const potentialSavings = convenienceData.amount * 0.4; // 40% savings by switching
+    
+    opportunities.push({
+      id: 'convenience-to-supermarket',
+      category: 'Convenience Stores',
+      suggestion: `You spent ${convenienceData.amount.toFixed(2)} DKK at convenience stores across ${convenienceData.count} purchases. If you switched half of that to Lidl or Netto, you could save ~${potentialSavings.toFixed(2)} DKK per month`,
+      impact: 'high',
+      savingsEstimate: potentialSavings,
+      timeframe: 'monthly'
+    });
+  }
+  
+  // Check for dining out savings
+  const dining = categoryStats['Dining'] || categoryStats['Restaurant'] || 
+                 Object.entries(categoryStats).find(([name]) => 
+                   name.toLowerCase().includes('dining') || name.toLowerCase().includes('restaurant')
+                 )?.[1];
+  
+  if (dining && (dining as any).amount > 800) {
+    const diningData = dining as any;
+    const potentialSavings = diningData.amount * 0.3; // 30% savings by cooking more
+    
+    opportunities.push({
+      id: 'dining-reduction',
+      category: 'Dining',
+      suggestion: `You spent ${diningData.amount.toFixed(2)} DKK on dining out. Cooking at home 3 more times per week could save you ~${potentialSavings.toFixed(2)} DKK monthly`,
+      impact: 'medium',
+      savingsEstimate: potentialSavings,
+      timeframe: 'monthly'
+    });
+  }
+  
+  // Check for transport savings
+  const transport = categoryStats['Transport'] || categoryStats['Transportation'];
+  if (transport && (transport as any).amount > 400) {
+    const transportData = transport as any;
+    const potentialSavings = transportData.amount * 0.2; // 20% savings with monthly pass
+    
+    opportunities.push({
+      id: 'transport-optimization',
+      category: 'Transport',
+      suggestion: `You spent ${transportData.amount.toFixed(2)} DKK on transport. A monthly pass might save you ~${potentialSavings.toFixed(2)} DKK`,
+      impact: 'medium',
+      savingsEstimate: potentialSavings,
+      timeframe: 'monthly'
+    });
+  }
+  
+  return opportunities;
+}
+
+// Generate spending pattern insights
+function generateSpendingPatterns(frequencyStats: any, merchantStats: any) {
+  const patterns = [];
+  
+  // Find high-frequency, low-amount patterns
+  const highFrequencyMerchants = Object.entries(merchantStats)
+    .filter(([_, stats]) => (stats as any).count >= 5)
+    .sort(([,a], [,b]) => (b as any).count - (a as any).count);
+  
+  for (const [merchant, stats] of highFrequencyMerchants.slice(0, 3)) {
+    const merchantData = stats as any;
+    const avgAmount = merchantData.amount / merchantData.count;
+    
+    patterns.push({
+      type: 'spending_pattern',
+      title: `Frequent ${merchant} Visits`,
+      description: `You visited ${merchant} ${merchantData.count} times this month, spending an average of ${avgAmount.toFixed(2)} DKK per visit`,
+      potentialSavings: 0,
+      timeframe: 'monthly',
+      pattern: 'high_frequency',
+      merchant: merchant
+    });
+  }
+  
+  return patterns;
+}
+
+// Generate frequency statistics
+function generateFrequencyStats(transactions: any[]) {
+  const stats: any = {};
+  
+  transactions.forEach(t => {
+    const merchant = t.merchant || 'Unknown';
+    if (!stats[merchant]) {
+      stats[merchant] = { dates: [], amounts: [] };
+    }
+    stats[merchant].dates.push(t.date);
+    stats[merchant].amounts.push(t.amount);
+  });
+  
+  return stats;
 }
 
 // Helper function to generate category statistics
@@ -144,14 +235,15 @@ function getMerchantStats(transactions: any[]) {
   transactions.forEach(t => {
     const merchant = t.merchant;
     if (!merchantStats[merchant]) {
-      merchantStats[merchant] = 0;
+      merchantStats[merchant] = { amount: 0, count: 0 };
     }
-    merchantStats[merchant] += t.amount;
+    merchantStats[merchant].amount += t.amount;
+    merchantStats[merchant].count += 1;
   });
   
   // Sort by amount and return top merchants
   return Object.fromEntries(
-    Object.entries(merchantStats).sort(([,a], [,b]) => (b as number) - (a as number))
+    Object.entries(merchantStats).sort(([,a], [,b]) => (b as any).amount - (a as any).amount)
   );
 }
 

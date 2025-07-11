@@ -111,6 +111,61 @@ Content-Type: application/json
 }
 ```
 
+### 6. Get Potential Manual Transfers
+```http
+GET /api/internal-transfers/manual?userId={userId}
+```
+
+**Response:**
+```json
+{
+  "potentialTransfers": [
+    {
+      "id": "tx1-id-tx2-id",
+      "fromTransaction": {
+        "id": "tx1-id",
+        "amount": -500.00,
+        "date": "2024-01-15",
+        "accountName": "Checking Account",
+        "description": "Transfer"
+      },
+      "toTransaction": {
+        "id": "tx2-id", 
+        "amount": 500.00,
+        "date": "2024-01-15",
+        "accountName": "Savings Account",
+        "description": "Transfer"
+      },
+      "amount": 500.00,
+      "date": "2024-01-15",
+      "suggestedCategory": "Internal Transfer"
+    }
+  ]
+}
+```
+
+### 7. Manually Categorize Transfer
+```http
+POST /api/internal-transfers/manual
+Content-Type: application/json
+
+{
+  "userId": "uuid",
+  "fromTransactionId": "tx1-id",
+  "toTransactionId": "tx2-id", 
+  "category": "Emergency Fund",
+  "description": "Moving money to emergency savings"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Manual transfer categorized as \"Emergency Fund\""
+}
+```
+
 ## How Detection Works
 
 The system detects internal transfers by:
