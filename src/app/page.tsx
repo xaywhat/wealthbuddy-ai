@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Link from 'next/link';
+import { useTimePeriod } from '@/contexts/TimePeriodContext';
 
 interface User {
   id: string;
@@ -95,6 +96,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { selectedPeriod, customStartDate, customEndDate, getPeriodLabel } = useTimePeriod();
 
   useEffect(() => {
     const userData = localStorage.getItem('wealthbuddy_user');
@@ -108,10 +110,26 @@ export default function HomePage() {
     loadDashboardData(parsedUser.id);
   }, [router]);
 
+  // Reload data when time period changes
+  useEffect(() => {
+    if (user) {
+      loadDashboardData(user.id);
+    }
+  }, [selectedPeriod, customStartDate, customEndDate, user]);
+
   const loadDashboardData = async (userId: string) => {
     try {
       setLoading(true);
       setError(null);
+
+      // Build period parameters
+      const periodParams = new URLSearchParams();
+      periodParams.append('userId', userId);
+      periodParams.append('period', selectedPeriod);
+      if (selectedPeriod === 'custom' && customStartDate && customEndDate) {
+        periodParams.append('startDate', customStartDate);
+        periodParams.append('endDate', customEndDate);
+      }
 
       // Load all dashboard data in parallel
       const [
@@ -125,7 +143,7 @@ export default function HomePage() {
       ] = await Promise.all([
         fetch(`/api/data/accounts?userId=${userId}`),
         fetch(`/api/data/transactions?userId=${userId}&limit=5`),
-        fetch(`/api/financial-summary?userId=${userId}&period=this_month`),
+        fetch(`/api/financial-summary?${periodParams.toString()}`),
         fetch(`/api/budgets?userId=${userId}&limit=3`),
         fetch(`/api/goals?userId=${userId}&limit=3`),
         fetch(`/api/insights?userId=${userId}&limit=3`),
@@ -278,51 +296,96 @@ export default function HomePage() {
     <Layout>
       <div className="p-4 space-y-6">
         {/* Welcome Section */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
-          <h1 className="text-2xl font-bold mb-2">
-            Welcome back, {user?.keyphrase}! 👋
-          </h1>
-          <p className="text-blue-100">
-            Here's your financial overview for this month
-          </p>
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl p-5 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold mb-1">
+                Welcome back, {user?.keyphrase}! 👋
+              </h1>
+              <p className="text-blue-100 text-sm">
+                Here's your financial overview for {getPeriodLabel().toLowerCase()}
+              </p>
+            </div>
+            <div className="hidden sm:block">
+              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Financial Summary Cards */}
         {financialSummary && (
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl p-4 shadow-sm">
-              <div className="flex items-center space-x-2 mb-2">
-                <span className="text-lg">💰</span>
-                <span className="text-sm font-medium text-gray-600">Income</span>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-700">Income</span>
+                </div>
               </div>
-              <p className="text-xl font-bold text-green-600">
+              <p className="text-2xl font-bold text-green-700 mb-1">
                 {formatCurrency(financialSummary.totalIncome)}
               </p>
-              <p className="text-xs text-gray-500">This month</p>
+              <p className="text-xs text-green-600 font-medium">{getPeriodLabel()}</p>
             </div>
 
-            <div className="bg-white rounded-xl p-4 shadow-sm">
-              <div className="flex items-center space-x-2 mb-2">
-                <span className="text-lg">💸</span>
-                <span className="text-sm font-medium text-gray-600">Expenses</span>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-red-100">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                    </svg>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-700">Expenses</span>
+                </div>
               </div>
-              <p className="text-xl font-bold text-red-600">
+              <p className="text-2xl font-bold text-red-700 mb-1">
                 {formatCurrency(financialSummary.totalExpenses)}
               </p>
-              <p className="text-xs text-gray-500">This month</p>
+              <p className="text-xs text-red-600 font-medium">{getPeriodLabel()}</p>
             </div>
 
-            <div className="bg-white rounded-xl p-4 shadow-sm col-span-2">
-              <div className="flex items-center space-x-2 mb-2">
-                <span className="text-lg">📊</span>
-                <span className="text-sm font-medium text-gray-600">Net Amount</span>
+            <div className="bg-white rounded-xl p-6 shadow-sm col-span-2 border-2 border-blue-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                    financialSummary.netAmount >= 0 ? 'bg-green-100' : 'bg-red-100'
+                  }`}>
+                    <svg className={`w-6 h-6 ${financialSummary.netAmount >= 0 ? 'text-green-600' : 'text-red-600'}`} 
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="text-base font-semibold text-gray-700">Net Amount</span>
+                    <p className="text-xs text-gray-500">Overall financial position</p>
+                  </div>
+                </div>
               </div>
-              <p className={`text-2xl font-bold ${financialSummary.netAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-3xl font-bold mb-2 ${financialSummary.netAmount >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                 {formatCurrency(financialSummary.netAmount)}
               </p>
-              <p className="text-xs text-gray-500">
-                {financialSummary.transactionCount} transactions this month
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">
+                  {financialSummary.transactionCount} transactions for {getPeriodLabel().toLowerCase()}
+                </p>
+                <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                  financialSummary.netAmount >= 0 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  {financialSummary.netAmount >= 0 ? '💰 Positive' : '⚠️ Negative'}
+                </span>
+              </div>
             </div>
           </div>
         )}

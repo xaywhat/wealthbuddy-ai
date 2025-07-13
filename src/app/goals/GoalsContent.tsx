@@ -219,8 +219,28 @@ export default function GoalsContent() {
   };
 
   const handleCreateGoal = async () => {
-    if (!user || !newGoal.title || !newGoal.targetAmount || !newGoal.targetDate) {
-      alert('Please fill in all required fields');
+    // Enhanced validation
+    if (!user) {
+      alert('User not authenticated');
+      return;
+    }
+
+    if (!newGoal.title || !newGoal.targetAmount || !newGoal.targetDate || !newGoal.goalType) {
+      alert('Please fill in all required fields (Title, Target Amount, Target Date, and Goal Type)');
+      return;
+    }
+
+    const targetAmount = parseFloat(newGoal.targetAmount);
+    if (isNaN(targetAmount) || targetAmount <= 0) {
+      alert('Please enter a valid target amount greater than 0');
+      return;
+    }
+
+    // Validate target date is in the future
+    const targetDate = new Date(newGoal.targetDate);
+    const today = new Date();
+    if (targetDate <= today) {
+      alert('Target date must be in the future');
       return;
     }
 
@@ -235,7 +255,7 @@ export default function GoalsContent() {
           goal: {
             name: newGoal.title,
             description: newGoal.description || null,
-            target_amount: parseFloat(newGoal.targetAmount),
+            target_amount: targetAmount,
             target_date: newGoal.targetDate,
             goal_type: newGoal.goalType,
             category: newGoal.category || null,
@@ -259,13 +279,14 @@ export default function GoalsContent() {
           autoCalculate: true
         });
         setShowCreateModal(false);
-        alert('Goal created successfully!');
+        // Use better success notification
+        alert('🎯 Goal created successfully!');
       } else {
-        alert(data.error || 'Failed to create goal');
+        alert(`❌ Failed to create goal: ${data.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error creating goal:', error);
-      alert('Failed to create goal');
+      alert('❌ Failed to create goal - please try again');
     }
   };
 

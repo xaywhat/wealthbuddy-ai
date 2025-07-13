@@ -200,8 +200,26 @@ export default function BudgetsContent() {
   };
 
   const handleCreateBudget = async () => {
-    if (!user || !newBudget.category || !newBudget.amount) {
-      alert('Please fill in all required fields');
+    // Enhanced validation
+    if (!user) {
+      alert('User not authenticated');
+      return;
+    }
+
+    if (!newBudget.category || !newBudget.amount || !newBudget.period) {
+      alert('Please fill in all required fields (Category, Amount, and Period)');
+      return;
+    }
+
+    const amount = parseFloat(newBudget.amount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount greater than 0');
+      return;
+    }
+
+    const alertThreshold = parseInt(newBudget.alertThreshold);
+    if (isNaN(alertThreshold) || alertThreshold < 0 || alertThreshold > 100) {
+      alert('Alert threshold must be between 0 and 100');
       return;
     }
 
@@ -216,9 +234,9 @@ export default function BudgetsContent() {
           budget: {
             name: `${newBudget.category} Budget`,
             category: newBudget.category,
-            amount: parseFloat(newBudget.amount),
+            amount: amount,
             period_type: newBudget.period,
-            alert_threshold: parseInt(newBudget.alertThreshold) / 100,
+            alert_threshold: alertThreshold / 100,
             description: newBudget.description || null
           }
         }),
@@ -236,13 +254,14 @@ export default function BudgetsContent() {
           description: ''
         });
         setShowCreateModal(false);
-        alert('Budget created successfully!');
+        // Use better success notification
+        alert('✅ Budget created successfully!');
       } else {
-        alert(data.error || 'Failed to create budget');
+        alert(`❌ Failed to create budget: ${data.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error creating budget:', error);
-      alert('Failed to create budget');
+      alert('❌ Failed to create budget - please try again');
     }
   };
 

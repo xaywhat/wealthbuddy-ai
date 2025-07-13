@@ -35,6 +35,9 @@ export default function TransactionsContent() {
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'category'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
+  const [suggestingFor, setSuggestingFor] = useState<string | null>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<{category: string, confidence: number, reasoning: string} | null>(null);
+  const [suggestedForTransaction, setSuggestedForTransaction] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -107,6 +110,26 @@ export default function TransactionsContent() {
     return amount >= 0 ? 'text-green-600' : 'text-red-600';
   };
 
+  const getCategorySourceIcon = (transaction: Transaction) => {
+    const source = transaction.category_source || 'auto';
+    switch (source) {
+      case 'manual': return '👤'; // User manually set
+      case 'rule': return '⚡'; // Rule-based
+      case 'auto': 
+      default: return '🤖'; // AI/automatic
+    }
+  };
+
+  const getCategorySourceColor = (transaction: Transaction) => {
+    const source = transaction.category_source || 'auto';
+    switch (source) {
+      case 'manual': return 'bg-green-100 text-green-800';
+      case 'rule': return 'bg-blue-100 text-blue-800';
+      case 'auto':
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   // Apply all filters
   useEffect(() => {
     let filtered = [...transactions];
@@ -175,12 +198,52 @@ export default function TransactionsContent() {
             : t
         ));
         setEditingTransaction(null);
+        setAiSuggestion(null);
+        setSuggestedForTransaction(null);
       } else {
         alert('Failed to update category');
       }
     } catch (error) {
       console.error('Error updating category:', error);
       alert('Failed to update category');
+    }
+  };
+
+  const handleSuggestCategory = async (transaction: Transaction) => {
+    if (!user) return;
+
+    try {
+      setSuggestingFor(transaction.id);
+      setAiSuggestion(null);
+
+      const response = await fetch('/api/transactions/suggest-category', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ transaction }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.suggestion) {
+          setAiSuggestion(data.suggestion);
+          setSuggestedForTransaction(transaction.id);
+        }
+      } else {
+        alert('Failed to get AI suggestion');
+      }
+    } catch (error) {
+      console.error('Error getting AI suggestion:', error);
+      alert('Failed to get AI suggestion');
+    } finally {
+      setSuggestingFor(null);
+    }
+  };
+
+  const applyAiSuggestion = (transactionId: string) => {
+    if (aiSuggestion) {
+      handleUpdateTransactionCategory(transactionId, aiSuggestion.category);
     }
   };
 
@@ -294,6 +357,41 @@ export default function TransactionsContent() {
           </div>
         )}
 
+        {/* AI Suggestion Modal */}
+        {aiSuggestion && suggestedForTransaction && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h4 className="font-medium text-blue-900 mb-2">🤖 AI Category Suggestion</h4>
+                <p className="text-sm text-blue-800 mb-2">
+                  <strong>Suggested:</strong> {aiSuggestion.category} 
+                  <span className="ml-2 text-xs bg-blue-200 px-2 py-1 rounded">
+                    {(aiSuggestion.confidence * 100).toFixed(0)}% confidence
+                  </span>
+                </p>
+                <p className="text-sm text-blue-700 mb-3">{aiSuggestion.reasoning}</p>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => applyAiSuggestion(suggestedForTransaction)}
+                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                  >
+                    Apply Suggestion
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAiSuggestion(null);
+                      setSuggestedForTransaction(null);
+                    }}
+                    className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm hover:bg-gray-300"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Transactions List */}
         <div className="bg-white rounded-xl shadow-sm">
           {filteredTransactions.length === 0 ? (
@@ -336,15 +434,32 @@ export default function TransactionsContent() {
                               ))}
                             </select>
                           ) : (
-                            <span 
-                              className="text-xs px-2 py-1 rounded-full cursor-pointer bg-gray-100 text-gray-800"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingTransaction(transaction.id);
-                              }}
-                            >
-                              {getEffectiveCategory(transaction)}
-                            </span>
+                            <div className="flex items-center space-x-1">
+                              <span 
+                                className={`text-xs px-2 py-1 rounded-full cursor-pointer ${getCategorySourceColor(transaction)}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingTransaction(transaction.id);
+                                }}
+                                title={`${getEffectiveCategory(transaction)} (${transaction.category_source || 'auto'})`}
+                              >
+                                {getCategorySourceIcon(transaction)} {getEffectiveCategory(transaction)}
+                              </span>
+                              
+                              {/* AI Suggest Button */}
+                              {getEffectiveCategory(transaction) === 'Uncategorized' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSuggestCategory(transaction);
+                                  }}
+                                  disabled={suggestingFor === transaction.id}
+                                  className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 disabled:opacity-50"
+                                >
+                                  {suggestingFor === transaction.id ? '🔄' : '🤖'} Suggest
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                         <div className="flex items-center space-x-2 mt-1">
@@ -369,6 +484,25 @@ export default function TransactionsContent() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Legend */}
+        <div className="bg-gray-50 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Category Source Legend</h4>
+          <div className="flex flex-wrap gap-3 text-xs">
+            <div className="flex items-center space-x-1">
+              <span className="bg-green-100 text-green-800 px-2 py-1 rounded">👤 Manual</span>
+              <span className="text-gray-600">User categorized</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">⚡ Rule</span>
+              <span className="text-gray-600">Rule-based</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">🤖 Auto</span>
+              <span className="text-gray-600">AI categorized</span>
+            </div>
+          </div>
         </div>
       </div>
     </Layout>

@@ -253,10 +253,32 @@ export default function CategoriesContent() {
     const totals: Record<string, { amount: number; count: number; trend: number }> = {};
     Object.entries(grouped).forEach(([category, transactions]) => {
       const amount = transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      
+      // Calculate real trend based on transaction dates
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      
+      const recentTransactions = transactions.filter(t => new Date(t.date) >= thirtyDaysAgo);
+      const previousTransactions = transactions.filter(t => {
+        const date = new Date(t.date);
+        return date >= sixtyDaysAgo && date < thirtyDaysAgo;
+      });
+      
+      const recentAmount = recentTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      const previousAmount = previousTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      
+      let trend = 0;
+      if (previousAmount > 0) {
+        trend = ((recentAmount - previousAmount) / previousAmount) * 100;
+      } else if (recentAmount > 0) {
+        trend = 100; // New spending category
+      }
+      
       totals[category] = { 
         amount, 
         count: transactions.length,
-        trend: Math.random() * 20 - 10 // Mock trend for now
+        trend: Math.min(Math.max(trend, -99), 99) // Cap at ±99%
       };
     });
     

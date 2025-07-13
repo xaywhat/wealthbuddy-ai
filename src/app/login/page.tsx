@@ -28,7 +28,7 @@ export default function LoginPage() {
       if (response.ok) {
         // Store user session
         localStorage.setItem('wealthbuddy_user', JSON.stringify(data.user));
-        router.push('/dashboard');
+        router.push('/');
       } else {
         setError(data.error || 'Login failed');
       }

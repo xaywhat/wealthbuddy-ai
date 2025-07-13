@@ -36,6 +36,185 @@ export async function analyzeSpendingHabits(transactions: any[]) {
   }
 }
 
+// Enhanced AI-powered transaction categorization and anomaly detection
+export async function detectSpendingAnomalies(transactions: any[], userId: string): Promise<any[]> {
+  try {
+    const recentTransactions = transactions
+      .filter(t => {
+        const txDate = new Date(t.date);
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        return txDate >= thirtyDaysAgo;
+      })
+      .slice(0, 50); // Limit for API efficiency
+
+    if (recentTransactions.length < 5) {
+      return [];
+    }
+
+    const prompt = `
+Analyze these Danish banking transactions for spending anomalies and unusual patterns:
+
+TRANSACTIONS:
+${recentTransactions.map(t => 
+  `${t.date}: ${t.description} - ${Math.abs(t.amount)} DKK (${t.category || 'Uncategorized'})`
+).join('\n')}
+
+Identify:
+1. Unusually large transactions (compared to typical spending)
+2. Duplicate or suspicious charges
+3. Unexpected merchants or categories
+4. Weekend vs weekday spending spikes
+5. New subscription services
+
+Return ONLY valid JSON:
+{
+  "anomalies": [
+    {
+      "type": "large_transaction" | "duplicate_charge" | "unusual_merchant" | "spending_spike" | "new_subscription",
+      "description": "Human-readable explanation",
+      "transactionId": "transaction_id_if_applicable",
+      "severity": "low" | "medium" | "high",
+      "actionRequired": "Suggested action for user",
+      "potentialSavings": amount_in_dkk
+    }
+  ]
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: "You are a Danish financial security expert. Analyze transactions for anomalies and provide actionable insights. Respond only with valid JSON."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.2,
+      max_tokens: 1500,
+    });
+
+    const response = completion.choices[0].message.content;
+    const jsonMatch = response?.match(/\{[\s\S]*\}/);
+    
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+      return result.anomalies || [];
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Error detecting spending anomalies:', error);
+    return [];
+  }
+}
+
+// AI-powered smart transaction categorization
+export async function suggestTransactionCategory(transaction: any): Promise<{category: string, confidence: number, reasoning: string}> {
+  try {
+    const prompt = `
+Categorize this Danish bank transaction:
+
+Transaction: "${transaction.description}"
+Merchant: "${transaction.creditor_name || transaction.debtor_name || 'Unknown'}"
+Amount: ${Math.abs(transaction.amount)} DKK
+Date: ${transaction.date}
+
+Danish Context:
+- Netto, Rema 1000, Bilka = Groceries
+- 7-Eleven = Convenience Stores  
+- DSB, Rejsekort = Transport
+- Spotify, Netflix = Entertainment
+- Shell, Q8 = Gas
+
+Categories: Groceries, Transport, Dining, Shopping, Bills, Entertainment, Healthcare, Gas, Convenience Stores, MobilePay, Internal Transfer, Income, Subscriptions, Insurance, Rent, Utilities, Education, Fitness, Beauty, Gifts, Travel, Clothing, Pet Care, Home Improvement, Charity, Investment, Loans, Fees, ATM, Parking, Uncategorized
+
+Return ONLY valid JSON:
+{
+  "category": "most_appropriate_category",
+  "confidence": 0.95,
+  "reasoning": "Brief explanation of why this category fits"
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: "You are a Danish financial categorization expert. Provide accurate transaction categorization with confidence scores."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 200,
+    });
+
+    const response = completion.choices[0].message.content;
+    const jsonMatch = response?.match(/\{[\s\S]*\}/);
+    
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+      return {
+        category: result.category || 'Uncategorized',
+        confidence: result.confidence || 0.5,
+        reasoning: result.reasoning || 'AI categorization'
+      };
+    }
+
+    // Fallback to rule-based categorization
+    const fallback = categorizeByRules(transaction.description, transaction.creditor_name || transaction.debtor_name || '');
+    return {
+      category: fallback.category,
+      confidence: fallback.confidence,
+      reasoning: 'Rule-based categorization'
+    };
+
+  } catch (error) {
+    console.error('Error suggesting transaction category:', error);
+    const fallback = categorizeByRules(transaction.description, transaction.creditor_name || transaction.debtor_name || '');
+    return {
+      category: fallback.category,
+      confidence: fallback.confidence,
+      reasoning: 'Fallback categorization'
+    };
+  }
+}
+
+// Helper function for rule-based categorization
+function categorizeByRules(description: string, merchantName: string): {category: string, confidence: number} {
+  const desc = description.toLowerCase();
+  const merchant = merchantName.toLowerCase();
+  
+  // Enhanced categorization with confidence scores
+  const rules = [
+    { patterns: ['netto', 'rema', 'bilka', 'føtex', 'irma', 'kvickly', 'lidl', 'aldi'], category: 'Groceries', confidence: 0.95 },
+    { patterns: ['7-eleven', '7eleven', 'convenience'], category: 'Convenience Stores', confidence: 0.9 },
+    { patterns: ['dsb', 'rejsekort', 'movia', 'transport'], category: 'Transport', confidence: 0.9 },
+    { patterns: ['shell', 'q8', 'circle k', 'ok benzin', 'benzin'], category: 'Gas', confidence: 0.9 },
+    { patterns: ['spotify', 'netflix', 'disney', 'hbo', 'streaming'], category: 'Entertainment', confidence: 0.95 },
+    { patterns: ['restaurant', 'cafe', 'pizza', 'burger', 'mcdonalds'], category: 'Dining', confidence: 0.85 },
+    { patterns: ['apotek', 'læge', 'tandlæge', 'hospital'], category: 'Healthcare', confidence: 0.9 },
+    { patterns: ['tdc', 'yousee', 'telenor', '3dk'], category: 'Bills', confidence: 0.9 },
+    { patterns: ['overførsel', 'transfer', 'fra konto', 'til konto'], category: 'Internal Transfer', confidence: 0.8 },
+    { patterns: ['mobilepay'], category: 'MobilePay', confidence: 0.95 },
+  ];
+
+  for (const rule of rules) {
+    for (const pattern of rule.patterns) {
+      if (desc.includes(pattern) || merchant.includes(pattern)) {
+        return { category: rule.category, confidence: rule.confidence };
+      }
+    }
+  }
+
+  return { category: 'Uncategorized', confidence: 0.3 };
+}
+
 // Real AI Analysis using OpenAI
 async function generateAIAnalysis(transactions: any[]) {
   try {
