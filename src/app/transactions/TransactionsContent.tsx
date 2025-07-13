@@ -2,7 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Layout from '@/components/Layout';
+import { useTimePeriod } from '@/contexts/TimePeriodContext';
+import { 
+  CreditCard, 
+  Filter, 
+  Search, 
+  Download, 
+  Eye, 
+  Edit3, 
+  AlertTriangle,
+  ArrowUpRight,
+  ArrowDownRight,
+  Calendar,
+  DollarSign,
+  BarChart3,
+  X,
+  Sparkles
+} from 'lucide-react';
 
 interface User {
   id: string;
@@ -12,39 +28,33 @@ interface User {
 
 interface Transaction {
   id: string;
-  date: string;
   description: string;
   amount: number;
-  currency: string;
-  category?: string;
-  user_category?: string;
-  category_source?: 'auto' | 'manual' | 'rule';
-  creditor_name?: string;
-  debtor_name?: string;
-  account_id: string;
+  category: string;
+  date: string;
+  account_name?: string;
+  is_categorized_automatically?: boolean;
+  confidence_score?: number;
 }
 
 export default function TransactionsContent() {
   const [user, setUser] = useState<User | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('this_month');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [sortBy, setSortBy] = useState<'date' | 'amount' | 'category'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
-  const [suggestingFor, setSuggestingFor] = useState<string | null>(null);
-  const [aiSuggestion, setAiSuggestion] = useState<{category: string, confidence: number, reasoning: string} | null>(null);
-  const [suggestedForTransaction, setSuggestedForTransaction] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState(''); // all, income, expense
+  const [showFilters, setShowFilters] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { getPeriodLabel } = useTimePeriod();
 
   // Get initial filters from URL params
-  const categoryFromUrl = searchParams.get('category');
+  const initialCategory = searchParams.get('category');
+  const initialGoal = searchParams.get('goal');
 
   useEffect(() => {
     const userData = localStorage.getItem('wealthbuddy_user');
@@ -58,19 +68,45 @@ export default function TransactionsContent() {
     loadData(parsedUser.id);
 
     // Set initial filters from URL
-    if (categoryFromUrl) {
-      setSelectedCategory(categoryFromUrl);
+    if (initialCategory) {
+      setCategoryFilter(initialCategory);
     }
-  }, [router, categoryFromUrl]);
+  }, [router, initialCategory, initialGoal]);
+
+  // Apply filters when transactions or filter criteria change
+  useEffect(() => {
+    let filtered = [...transactions];
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(transaction =>
+        transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        transaction.category.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Category filter
+    if (categoryFilter) {
+      filtered = filtered.filter(transaction => transaction.category === categoryFilter);
+    }
+
+    // Type filter
+    if (typeFilter === 'income') {
+      filtered = filtered.filter(transaction => transaction.amount > 0);
+    } else if (typeFilter === 'expense') {
+      filtered = filtered.filter(transaction => transaction.amount < 0);
+    }
+
+    setFilteredTransactions(filtered);
+  }, [transactions, searchTerm, categoryFilter, typeFilter]);
 
   const loadData = async (userId: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Load all data in parallel
       const [transactionsRes, categoriesRes] = await Promise.all([
-        fetch(`/api/data/transactions?userId=${userId}`),
+        fetch(`/api/data/transactions?userId=${userId}&limit=100`),
         fetch(`/api/categories?userId=${userId}`)
       ]);
 
@@ -83,20 +119,17 @@ export default function TransactionsContent() {
 
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json();
-        setAvailableCategories(categoriesData.categories || []);
+        if (categoriesData.success) {
+          setAvailableCategories(categoriesData.categories || []);
+        }
       }
 
     } catch (error) {
-      console.error('Error loading transactions data:', error);
+      console.error('Error loading transactions:', error);
       setError('Failed to load transactions data');
     } finally {
       setLoading(false);
     }
-  };
-
-  // Helper functions
-  const getEffectiveCategory = (transaction: Transaction): string => {
-    return transaction.user_category || transaction.category || 'Uncategorized';
   };
 
   const formatCurrency = (amount: number) => {
@@ -106,196 +139,222 @@ export default function TransactionsContent() {
     }).format(amount);
   };
 
-  const getTransactionColor = (amount: number) => {
-    return amount >= 0 ? 'text-green-600' : 'text-red-600';
+  const getCategoryIcon = (category: string) => {
+    const iconMap: Record<string, string> = {
+      'Groceries': '🛒',
+      'Transport': '🚌',
+      'Dining': '🍽️',
+      'Shopping': '🛍️',
+      'Bills': '📄',
+      'Entertainment': '🎬',
+      'Healthcare': '🏥',
+      'Gas': '⛽',
+      'Convenience Stores': '🏪',
+      'MobilePay': '📱',
+      'Subscriptions': '📺',
+      'Insurance': '🛡️',
+      'Rent': '🏠',
+      'Utilities': '💡',
+      'Education': '📚',
+      'Fitness': '💪',
+      'Beauty': '💄',
+      'Gifts': '🎁',
+      'Travel': '✈️',
+      'Clothing': '👕',
+      'Pet Care': '🐕',
+      'Home Improvement': '🔨',
+      'Charity': '❤️',
+      'Investment': '📈',
+      'Loans': '💳',
+      'Fees': '💸',
+      'ATM': '🏧',
+      'Parking': '🅿️',
+      'Income': '💰',
+      'Internal Transfer': '🔄',
+      'Uncategorized': '❓',
+    };
+    return iconMap[category] || '📊';
   };
 
-  const getCategorySourceIcon = (transaction: Transaction) => {
-    const source = transaction.category_source || 'auto';
-    switch (source) {
-      case 'manual': return '👤'; // User manually set
-      case 'rule': return '⚡'; // Rule-based
-      case 'auto': 
-      default: return '🤖'; // AI/automatic
-    }
-  };
-
-  const getCategorySourceColor = (transaction: Transaction) => {
-    const source = transaction.category_source || 'auto';
-    switch (source) {
-      case 'manual': return 'bg-green-100 text-green-800';
-      case 'rule': return 'bg-blue-100 text-blue-800';
-      case 'auto':
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  // Apply all filters
-  useEffect(() => {
-    let filtered = [...transactions];
-
-    // Category filter
-    if (selectedCategory) {
-      filtered = filtered.filter(transaction => 
-        getEffectiveCategory(transaction) === selectedCategory
-      );
-    }
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(transaction =>
-        transaction.description.toLowerCase().includes(query) ||
-        transaction.creditor_name?.toLowerCase().includes(query) ||
-        transaction.debtor_name?.toLowerCase().includes(query) ||
-        getEffectiveCategory(transaction).toLowerCase().includes(query) ||
-        transaction.amount.toString().includes(query)
-      );
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      let result = 0;
-      switch (sortBy) {
-        case 'date':
-          result = new Date(a.date).getTime() - new Date(b.date).getTime();
-          break;
-        case 'amount':
-          result = Math.abs(a.amount) - Math.abs(b.amount);
-          break;
-        case 'category':
-          result = getEffectiveCategory(a).localeCompare(getEffectiveCategory(b));
-          break;
-      }
-      return sortOrder === 'desc' ? -result : result;
-    });
-
-    setFilteredTransactions(filtered);
-  }, [transactions, selectedCategory, searchQuery, sortBy, sortOrder]);
-
-  // Transaction management functions
-  const handleUpdateTransactionCategory = async (transactionId: string, newCategory: string) => {
-    if (!user) return;
-
-    try {
-      const response = await fetch('/api/categories/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          transactionId,
-          userId: user.id,
-          newCategory,
-        }),
-      });
-
-      if (response.ok) {
-        // Update local state
-        setTransactions(prev => prev.map(t => 
-          t.id === transactionId 
-            ? { ...t, user_category: newCategory, category_source: 'manual' as const }
-            : t
-        ));
-        setEditingTransaction(null);
-        setAiSuggestion(null);
-        setSuggestedForTransaction(null);
-      } else {
-        alert('Failed to update category');
-      }
-    } catch (error) {
-      console.error('Error updating category:', error);
-      alert('Failed to update category');
-    }
-  };
-
-  const handleSuggestCategory = async (transaction: Transaction) => {
-    if (!user) return;
-
-    try {
-      setSuggestingFor(transaction.id);
-      setAiSuggestion(null);
-
-      const response = await fetch('/api/transactions/suggest-category', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ transaction }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.suggestion) {
-          setAiSuggestion(data.suggestion);
-          setSuggestedForTransaction(transaction.id);
-        }
-      } else {
-        alert('Failed to get AI suggestion');
-      }
-    } catch (error) {
-      console.error('Error getting AI suggestion:', error);
-      alert('Failed to get AI suggestion');
-    } finally {
-      setSuggestingFor(null);
-    }
-  };
-
-  const applyAiSuggestion = (transactionId: string) => {
-    if (aiSuggestion) {
-      handleUpdateTransactionCategory(transactionId, aiSuggestion.category);
-    }
+  const getTransactionStats = () => {
+    const totalIncome = filteredTransactions
+      .filter(t => t.amount > 0)
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    const totalExpenses = filteredTransactions
+      .filter(t => t.amount < 0)
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    
+    const netAmount = totalIncome - totalExpenses;
+    
+    return { totalIncome, totalExpenses, netAmount };
   };
 
   const clearFilters = () => {
-    setSelectedCategory(null);
-    setSearchQuery('');
-    // Update URL to remove category filter
-    router.push('/transactions');
+    setSearchTerm('');
+    setCategoryFilter('');
+    setTypeFilter('');
+    setShowFilters(false);
   };
+
+  const { totalIncome, totalExpenses, netAmount } = getTransactionStats();
 
   if (loading) {
     return (
-      <Layout>
-        <div className="p-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-            <div className="h-12 bg-gray-200 rounded"></div>
-            <div className="space-y-3">
-              {[...Array(10)].map((_, i) => (
-                <div key={i} className="h-16 bg-gray-200 rounded"></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Layout>
+      <div style={{ padding: '20px' }}>
+        <div className="loading">Loading transactions...</div>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="p-4 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-            <p className="text-gray-600">
-              {filteredTransactions.length} of {transactions.length} transactions
-              {selectedCategory && ` in ${selectedCategory}`}
-            </p>
+    <div style={{ padding: '20px', gap: '24px', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div>
+        <h1 style={{ 
+          fontSize: '28px', 
+          fontWeight: '700', 
+          color: 'var(--text-primary)',
+          marginBottom: '8px'
+        }}>
+          Transactions
+        </h1>
+        <p style={{ 
+          color: 'var(--text-secondary)',
+          fontSize: '16px'
+        }}>
+          {filteredTransactions.length} transactions for {getPeriodLabel().toLowerCase()}
+          {categoryFilter && ` in ${categoryFilter}`}
+        </p>
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="alert alert-error">
+          <AlertTriangle size={16} />
+          {error}
+        </div>
+      )}
+
+      {/* Transaction Stats */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            width: '48px',
+            height: '48px',
+            backgroundColor: 'var(--accent-green)',
+            borderRadius: '12px',
+            margin: '0 auto 16px'
+          }}>
+            <ArrowUpRight size={24} color="white" />
           </div>
+          <div className="stat-value stat-positive">
+            {formatCurrency(totalIncome)}
+          </div>
+          <div className="stat-label">Total Income</div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {/* Category */}
+        <div className="stat-card">
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            width: '48px',
+            height: '48px',
+            backgroundColor: 'var(--accent-red)',
+            borderRadius: '12px',
+            margin: '0 auto 16px'
+          }}>
+            <ArrowDownRight size={24} color="white" />
+          </div>
+          <div className="stat-value stat-negative">
+            {formatCurrency(totalExpenses)}
+          </div>
+          <div className="stat-label">Total Expenses</div>
+        </div>
+
+        <div className="stat-card">
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            width: '48px',
+            height: '48px',
+            backgroundColor: netAmount >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+            borderRadius: '12px',
+            margin: '0 auto 16px'
+          }}>
+            <DollarSign size={24} color="white" />
+          </div>
+          <div className={`stat-value ${netAmount >= 0 ? 'stat-positive' : 'stat-negative'}`}>
+            {formatCurrency(netAmount)}
+          </div>
+          <div className="stat-label">Net Amount</div>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="card">
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: showFilters ? '16px' : '0' }}>
+          {/* Search */}
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Search size={20} style={{ 
+              position: 'absolute', 
+              left: '12px', 
+              top: '50%', 
+              transform: 'translateY(-50%)',
+              color: 'var(--text-muted)'
+            }} />
+            <input
+              type="text"
+              placeholder="Search transactions..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input"
+              style={{ paddingLeft: '44px' }}
+            />
+          </div>
+
+          {/* Filter Toggle */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="btn btn-secondary"
+          >
+            <Filter size={16} />
+            Filters
+          </button>
+
+          {/* Clear Filters */}
+          {(searchTerm || categoryFilter || typeFilter) && (
+            <button
+              onClick={clearFilters}
+              className="btn btn-ghost"
+            >
+              <X size={16} />
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Expanded Filters */}
+        {showFilters && (
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '12px',
+            padding: '16px',
+            backgroundColor: 'var(--bg-secondary)',
+            borderRadius: '8px'
+          }}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <label className="form-label">Category</label>
               <select
-                value={selectedCategory || ''}
-                onChange={(e) => setSelectedCategory(e.target.value || null)}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white text-gray-900"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="input"
               >
                 <option value="">All Categories</option>
                 {availableCategories.map(category => (
@@ -304,207 +363,161 @@ export default function TransactionsContent() {
               </select>
             </div>
 
-            {/* Sort */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sort by</label>
-              <div className="flex space-x-2">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-white text-gray-900"
-                >
-                  <option value="date">Date</option>
-                  <option value="amount">Amount</option>
-                  <option value="category">Category</option>
-                </select>
-                <button
-                  onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                  className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50"
-                >
-                  {sortOrder === 'asc' ? '↑' : '↓'}
-                </button>
-              </div>
-            </div>
-
-            {/* Search */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-              <input
-                type="text"
-                placeholder="Search transactions..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white text-gray-900"
-              />
+              <label className="form-label">Type</label>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="input"
+              >
+                <option value="">All Types</option>
+                <option value="income">Income</option>
+                <option value="expense">Expenses</option>
+              </select>
             </div>
           </div>
+        )}
+      </div>
 
-          {/* Clear Filters */}
-          <div className="flex justify-between items-center">
-            <button
-              onClick={clearFilters}
-              className="text-sm text-gray-600 hover:text-gray-800"
-            >
-              Clear Filters
-            </button>
+      {/* Transactions List */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <h3 className="card-title">Transaction History</h3>
+            <p className="card-subtitle">
+              Showing {filteredTransactions.length} of {transactions.length} transactions
+            </p>
           </div>
+          <button className="btn btn-ghost">
+            <Download size={16} />
+            Export
+          </button>
         </div>
 
-        {/* Error Display */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">{error}</p>
-          </div>
-        )}
-
-        {/* AI Suggestion Modal */}
-        {aiSuggestion && suggestedForTransaction && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <h4 className="font-medium text-blue-900 mb-2">🤖 AI Category Suggestion</h4>
-                <p className="text-sm text-blue-800 mb-2">
-                  <strong>Suggested:</strong> {aiSuggestion.category} 
-                  <span className="ml-2 text-xs bg-blue-200 px-2 py-1 rounded">
-                    {(aiSuggestion.confidence * 100).toFixed(0)}% confidence
-                  </span>
-                </p>
-                <p className="text-sm text-blue-700 mb-3">{aiSuggestion.reasoning}</p>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => applyAiSuggestion(suggestedForTransaction)}
-                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                  >
-                    Apply Suggestion
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAiSuggestion(null);
-                      setSuggestedForTransaction(null);
-                    }}
-                    className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm hover:bg-gray-300"
-                  >
-                    Dismiss
-                  </button>
+        {filteredTransactions.length > 0 ? (
+          <div>
+            {filteredTransactions.map((transaction) => (
+              <div key={transaction.id} className="list-item">
+                <div className="list-item-icon">
+                  <span style={{ fontSize: '20px' }}>{getCategoryIcon(transaction.category)}</span>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Transactions List */}
-        <div className="bg-white rounded-xl shadow-sm">
-          {filteredTransactions.length === 0 ? (
-            <div className="p-12 text-center">
-              <div className="text-6xl mb-4">📊</div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
-              <p className="text-gray-600">
-                {searchQuery || selectedCategory 
-                  ? 'Try adjusting your filters or search query'
-                  : 'Connect your bank account to see transactions here'}
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {filteredTransactions.map((transaction) => (
-                <div 
-                  key={transaction.id} 
-                  className="p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3 flex-1">
-                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                        <span className="text-sm">💳</span>
+                
+                <div className="list-item-content">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="list-item-title">{transaction.description}</div>
+                    {transaction.is_categorized_automatically && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        backgroundColor: 'var(--accent-blue)',
+                        color: 'white',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: '500'
+                      }}>
+                        <Sparkles size={10} />
+                        AI
                       </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <p className="font-medium text-gray-900 text-sm truncate">
-                            {transaction.description}
-                          </p>
-                          {editingTransaction === transaction.id ? (
-                            <select
-                              value={getEffectiveCategory(transaction)}
-                              onChange={(e) => handleUpdateTransactionCategory(transaction.id, e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-900"
-                            >
-                              {availableCategories.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div className="flex items-center space-x-1">
-                              <span 
-                                className={`text-xs px-2 py-1 rounded-full cursor-pointer ${getCategorySourceColor(transaction)}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingTransaction(transaction.id);
-                                }}
-                                title={`${getEffectiveCategory(transaction)} (${transaction.category_source || 'auto'})`}
-                              >
-                                {getCategorySourceIcon(transaction)} {getEffectiveCategory(transaction)}
-                              </span>
-                              
-                              {/* AI Suggest Button */}
-                              {getEffectiveCategory(transaction) === 'Uncategorized' && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSuggestCategory(transaction);
-                                  }}
-                                  disabled={suggestingFor === transaction.id}
-                                  className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 disabled:opacity-50"
-                                >
-                                  {suggestingFor === transaction.id ? '🔄' : '🤖'} Suggest
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <p className="text-xs text-gray-500">
-                            {new Date(transaction.date).toLocaleDateString('da-DK')}
-                          </p>
-                          <p className="text-xs text-gray-500">•</p>
-                          <p className="text-xs text-gray-500">
-                            {transaction.creditor_name || transaction.debtor_name || 'Unknown'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="text-right">
-                      <p className={`text-lg font-semibold ${getTransactionColor(transaction.amount)}`}>
-                        {formatCurrency(transaction.amount)}
-                      </p>
-                    </div>
+                    )}
+                  </div>
+                  <div className="list-item-subtitle">
+                    {transaction.category} • {new Date(transaction.date).toLocaleDateString('da-DK')}
+                    {transaction.account_name && ` • ${transaction.account_name}`}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Legend */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Category Source Legend</h4>
-          <div className="flex flex-wrap gap-3 text-xs">
-            <div className="flex items-center space-x-1">
-              <span className="bg-green-100 text-green-800 px-2 py-1 rounded">👤 Manual</span>
-              <span className="text-gray-600">User categorized</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">⚡ Rule</span>
-              <span className="text-gray-600">Rule-based</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">🤖 Auto</span>
-              <span className="text-gray-600">AI categorized</span>
-            </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div className={`list-item-value ${transaction.amount >= 0 ? 'stat-positive' : 'stat-negative'}`}>
+                    {transaction.amount >= 0 ? '+' : ''}{formatCurrency(transaction.amount)}
+                  </div>
+                  <button
+                    onClick={() => router.push(`/transactions/${transaction.id}`)}
+                    className="btn btn-ghost"
+                    style={{ padding: '8px' }}
+                  >
+                    <Eye size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '40px',
+            color: 'var(--text-secondary)'
+          }}>
+            <CreditCard size={48} style={{ margin: '0 auto 16px', color: 'var(--text-muted)' }} />
+            <p>No transactions found</p>
+            <p style={{ fontSize: '14px', marginTop: '8px' }}>
+              {(searchTerm || categoryFilter || typeFilter) 
+                ? 'Try adjusting your filters'
+                : 'Connect your bank account to see transactions'
+              }
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <h3 className="card-title">Quick Actions</h3>
+            <p className="card-subtitle">Manage your transactions</p>
           </div>
         </div>
+
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+          gap: '12px' 
+        }}>
+          <button
+            onClick={() => router.push('/categories')}
+            className="btn btn-secondary"
+            style={{ 
+              padding: '16px',
+              flexDirection: 'column',
+              height: 'auto',
+              textAlign: 'center'
+            }}
+          >
+            <BarChart3 size={24} style={{ marginBottom: '8px' }} />
+            <span>View Categories</span>
+          </button>
+
+          <button
+            onClick={() => router.push('/budgets?add=true')}
+            className="btn btn-secondary"
+            style={{ 
+              padding: '16px',
+              flexDirection: 'column',
+              height: 'auto',
+              textAlign: 'center'
+            }}
+          >
+            <Calendar size={24} style={{ marginBottom: '8px' }} />
+            <span>Create Budget</span>
+          </button>
+
+          <button
+            onClick={() => router.push('/insights')}
+            className="btn btn-secondary"
+            style={{ 
+              padding: '16px',
+              flexDirection: 'column',
+              height: 'auto',
+              textAlign: 'center'
+            }}
+          >
+            <Sparkles size={24} style={{ marginBottom: '8px' }} />
+            <span>AI Insights</span>
+          </button>
+        </div>
       </div>
-    </Layout>
+    </div>
   );
 }

@@ -2,7 +2,24 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Layout from '@/components/Layout';
+import { useTimePeriod } from '@/contexts/TimePeriodContext';
+import { 
+  BarChart3, 
+  Plus, 
+  Edit3, 
+  Trash2, 
+  Eye, 
+  Target, 
+  AlertTriangle,
+  ArrowRight,
+  Filter,
+  Search,
+  X,
+  Settings,
+  TrendingUp,
+  TrendingDown,
+  DollarSign
+} from 'lucide-react';
 
 interface User {
   id: string;
@@ -10,49 +27,39 @@ interface User {
   created_at: string;
 }
 
-interface Transaction {
-  id: string;
-  date: string;
-  description: string;
-  amount: number;
-  currency: string;
-  category?: string;
-  user_category?: string;
-  category_source?: 'auto' | 'manual' | 'rule';
-  creditor_name?: string;
-  debtor_name?: string;
-  account_id: string;
+interface Category {
+  category: string;
+  total_amount: number;
+  transaction_count: number;
+  percentage: number;
+  trend?: 'up' | 'down' | 'stable';
 }
 
-interface CategorizationRule {
+interface CategoryRule {
   id: string;
-  keyword: string;
+  pattern: string;
   category: string;
-  rule_type: 'contains' | 'starts_with' | 'ends_with' | 'exact';
   priority: number;
+  created_at: string;
 }
 
 export default function CategoriesContent() {
   const [user, setUser] = useState<User | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
-  const [categorizationRules, setCategorizationRules] = useState<CategorizationRule[]>([]);
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('this_month');
-  const [customStartDate, setCustomStartDate] = useState<string>('');
-  const [customEndDate, setCustomEndDate] = useState<string>('');
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [showRulesModal, setShowRulesModal] = useState(false);
-  const [showCategoryList, setShowCategoryList] = useState(false);
-  const [newCategory, setNewCategory] = useState({ name: '', type: 'expense' as 'expense' | 'income' });
-  const [newRule, setNewRule] = useState({ keyword: '', category: '', ruleType: 'contains' });
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryRules, setCategoryRules] = useState<CategoryRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showAddRule, setShowAddRule] = useState(false);
+  const [newRule, setNewRule] = useState({
+    pattern: '',
+    category: '',
+    priority: 1
+  });
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  // Check if we should open add modal
-  const shouldOpenAddModal = searchParams.get('add') === 'true';
+  const { getPeriodLabel } = useTimePeriod();
 
   useEffect(() => {
     const userData = localStorage.getItem('wealthbuddy_user');
@@ -64,114 +71,38 @@ export default function CategoriesContent() {
     const parsedUser = JSON.parse(userData);
     setUser(parsedUser);
     loadData(parsedUser.id);
-
-    // Open add modal if needed
-    if (shouldOpenAddModal) {
-      setShowCategoryModal(true);
-    }
-  }, [router, shouldOpenAddModal]);
+  }, [router]);
 
   const loadData = async (userId: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Load all data in parallel
-      const [
-        transactionsRes,
-        categoriesRes,
-        rulesRes
-      ] = await Promise.all([
-        fetch(`/api/data/transactions?userId=${userId}`),
+      const [categoriesRes, rulesRes] = await Promise.all([
         fetch(`/api/categories?userId=${userId}`),
         fetch(`/api/categories/rules?userId=${userId}`)
       ]);
 
-      if (transactionsRes.ok) {
-        const transactionsData = await transactionsRes.json();
-        if (transactionsData.success) {
-          setTransactions(transactionsData.transactions || []);
-        }
-      }
-
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json();
-        setAvailableCategories(categoriesData.categories || []);
+        if (categoriesData.success) {
+          setCategories(categoriesData.categoryData || []);
+        }
       }
 
       if (rulesRes.ok) {
         const rulesData = await rulesRes.json();
-        setCategorizationRules(rulesData.rules || []);
+        if (rulesData.success) {
+          setCategoryRules(rulesData.rules || []);
+        }
       }
 
     } catch (error) {
-      console.error('Error loading categories data:', error);
+      console.error('Error loading categories:', error);
       setError('Failed to load categories data');
     } finally {
       setLoading(false);
     }
-  };
-
-  // Category helper functions
-  const getCategoryIcon = (category: string) => {
-    const icons: Record<string, string> = {
-      'Internal Transfer': '🔄',
-      'MobilePay': '📱',
-      'Convenience Stores': '🏪',
-      'Bills': '📄',
-      'Gas': '⛽',
-      'Groceries': '🛒',
-      'Transport': '🚌',
-      'Entertainment': '🎬',
-      'Dining': '🍽️',
-      'Shopping': '🛍️',
-      'Healthcare': '🏥',
-      'Income': '💰',
-      'Subscriptions': '📺',
-      'Insurance': '🛡️',
-      'Rent': '🏠',
-      'Utilities': '💡',
-      'Education': '📚',
-      'Fitness': '💪',
-      'Beauty': '💄',
-      'Gifts': '🎁',
-      'Travel': '✈️',
-      'Parking': '🅿️',
-      'ATM': '🏧',
-      'Investment': '📈',
-      'Loans': '💳',
-      'Fees': '💸',
-      'Pet Care': '🐕',
-      'Home Improvement': '🔨',
-      'Clothing': '👕',
-      'Charity': '❤️',
-      'Uncategorized': '❓',
-    };
-    return icons[category] || '📊';
-  };
-
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      'Internal Transfer': 'bg-gray-100 text-gray-800',
-      'MobilePay': 'bg-purple-100 text-purple-800',
-      'Convenience Stores': 'bg-orange-100 text-orange-800',
-      'Bills': 'bg-red-100 text-red-800',
-      'Gas': 'bg-yellow-100 text-yellow-800',
-      'Groceries': 'bg-green-100 text-green-800',
-      'Transport': 'bg-blue-100 text-blue-800',
-      'Entertainment': 'bg-pink-100 text-pink-800',
-      'Dining': 'bg-amber-100 text-amber-800',
-      'Shopping': 'bg-indigo-100 text-indigo-800',
-      'Healthcare': 'bg-teal-100 text-teal-800',
-      'Income': 'bg-emerald-100 text-emerald-800',
-      'Subscriptions': 'bg-violet-100 text-violet-800',
-      'Uncategorized': 'bg-gray-100 text-gray-600',
-    };
-    return colors[category] || 'bg-gray-100 text-gray-600';
-  };
-
-  const getEffectiveCategory = (transaction: Transaction): string => {
-    return transaction.user_category || transaction.category || 'Uncategorized';
   };
 
   const formatCurrency = (amount: number) => {
@@ -181,187 +112,62 @@ export default function CategoriesContent() {
     }).format(amount);
   };
 
-  // Time period filtering
-  const getDateRange = (period: string) => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    switch (period) {
-      case 'this_week': {
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        return { start: startOfWeek, end: new Date(now) };
-      }
-      case 'this_month': {
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        return { start: startOfMonth, end: new Date(now) };
-      }
-      case 'last_month': {
-        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-        return { start: startOfLastMonth, end: endOfLastMonth };
-      }
-      case 'last_3_months': {
-        const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-        return { start: threeMonthsAgo, end: new Date(now) };
-      }
-      case 'custom': {
-        if (customStartDate && customEndDate) {
-          return { 
-            start: new Date(customStartDate), 
-            end: new Date(customEndDate + 'T23:59:59') 
-          };
-        }
-        return null;
-      }
-      default:
-        return null;
+  const getCategoryIcon = (category: string) => {
+    const iconMap: Record<string, string> = {
+      'Groceries': '🛒',
+      'Transport': '🚌',
+      'Dining': '🍽️',
+      'Shopping': '🛍️',
+      'Bills': '📄',
+      'Entertainment': '🎬',
+      'Healthcare': '🏥',
+      'Gas': '⛽',
+      'Convenience Stores': '🏪',
+      'MobilePay': '📱',
+      'Subscriptions': '📺',
+      'Insurance': '🛡️',
+      'Rent': '🏠',
+      'Utilities': '💡',
+      'Education': '📚',
+      'Fitness': '💪',
+      'Beauty': '💄',
+      'Gifts': '🎁',
+      'Travel': '✈️',
+      'Clothing': '👕',
+      'Pet Care': '🐕',
+      'Home Improvement': '🔨',
+      'Charity': '❤️',
+      'Investment': '📈',
+      'Loans': '💳',
+      'Fees': '💸',
+      'ATM': '🏧',
+      'Parking': '🅿️',
+      'Income': '💰',
+      'Internal Transfer': '🔄',
+      'Uncategorized': '❓',
+    };
+    return iconMap[category] || '📊';
+  };
+
+  const getTrendIcon = (trend?: 'up' | 'down' | 'stable') => {
+    switch (trend) {
+      case 'up': return <TrendingUp size={16} className="text-red-400" />;
+      case 'down': return <TrendingDown size={16} className="text-green-400" />;
+      default: return <DollarSign size={16} className="text-gray-400" />;
     }
   };
 
-  const filterTransactionsByPeriod = (transactions: Transaction[], period: string) => {
-    if (period === 'all') return transactions;
-    
-    const dateRange = getDateRange(period);
-    if (!dateRange) return transactions;
-    
-    return transactions.filter(transaction => {
-      const transactionDate = new Date(transaction.date);
-      return transactionDate >= dateRange.start && transactionDate <= dateRange.end;
-    });
+  const getProgressBarWidth = (percentage: number) => {
+    return Math.min(percentage, 100);
   };
 
-  // Update filtered transactions when period changes
-  useEffect(() => {
-    const filtered = filterTransactionsByPeriod(transactions, selectedPeriod);
-    setFilteredTransactions(filtered);
-  }, [transactions, selectedPeriod, customStartDate, customEndDate]);
-
-  // Get category totals
-  const getCategoryTotals = () => {
-    const transactionsToUse = selectedPeriod === 'all' ? transactions : filteredTransactions;
-    const grouped: Record<string, Transaction[]> = {};
-    
-    transactionsToUse.forEach(transaction => {
-      const category = getEffectiveCategory(transaction);
-      if (!grouped[category]) {
-        grouped[category] = [];
-      }
-      grouped[category].push(transaction);
-    });
-
-    const totals: Record<string, { amount: number; count: number; trend: number }> = {};
-    Object.entries(grouped).forEach(([category, transactions]) => {
-      const amount = transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      
-      // Calculate real trend based on transaction dates
-      const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-      
-      const recentTransactions = transactions.filter(t => new Date(t.date) >= thirtyDaysAgo);
-      const previousTransactions = transactions.filter(t => {
-        const date = new Date(t.date);
-        return date >= sixtyDaysAgo && date < thirtyDaysAgo;
-      });
-      
-      const recentAmount = recentTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      const previousAmount = previousTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      
-      let trend = 0;
-      if (previousAmount > 0) {
-        trend = ((recentAmount - previousAmount) / previousAmount) * 100;
-      } else if (recentAmount > 0) {
-        trend = 100; // New spending category
-      }
-      
-      totals[category] = { 
-        amount, 
-        count: transactions.length,
-        trend: Math.min(Math.max(trend, -99), 99) // Cap at ±99%
-      };
-    });
-    
-    return totals;
-  };
-
-  // Category management functions
-  const handleCreateCategory = async () => {
-    if (!user || !newCategory.name.trim()) {
-      alert('Please enter a category name');
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/categories', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: user.id,
-          action: 'create',
-          categoryName: newCategory.name.trim(),
-          categoryType: newCategory.type,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        await loadData(user.id);
-        setNewCategory({ name: '', type: 'expense' });
-        setShowCategoryModal(false);
-        alert(`Category "${newCategory.name}" created successfully!`);
-      } else {
-        alert(data.error || 'Failed to create category');
-      }
-    } catch (error) {
-      console.error('Error creating category:', error);
-      alert('Failed to create category');
-    }
-  };
-
-  const handleDeleteCategory = async (categoryName: string) => {
-    if (!user) return;
-
-    const defaultCategories = [
-      'Groceries', 'Transportation', 'Dining', 'Shopping', 'Bills', 
-      'Entertainment', 'Healthcare', 'MobilePay', 'Convenience Stores',
-      'Internal Transfer', 'Income', 'Uncategorized'
-    ];
-
-    if (defaultCategories.includes(categoryName)) {
-      alert('Cannot delete default categories');
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to delete "${categoryName}"? All transactions in this category will be marked as uncategorized.`)) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/categories/delete?userId=${user.id}&category=${encodeURIComponent(categoryName)}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        await loadData(user.id);
-        alert(data.message);
-      } else {
-        alert(data.error || 'Failed to delete category');
-      }
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      alert('Failed to delete category');
-    }
-  };
+  const filteredCategories = categories.filter(category =>
+    category.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleCreateRule = async () => {
-    if (!user || !newRule.keyword || !newRule.category) {
-      alert('Please fill in all fields');
+    if (!user || !newRule.pattern || !newRule.category) {
+      setError('Please fill in all required fields');
       return;
     }
 
@@ -373,497 +179,420 @@ export default function CategoriesContent() {
         },
         body: JSON.stringify({
           userId: user.id,
-          keyword: newRule.keyword,
-          category: newRule.category,
-          ruleType: newRule.ruleType,
-          priority: 0,
+          rule: newRule
         }),
       });
 
-      if (response.ok) {
+      const data = await response.json();
+
+      if (data.success) {
         await loadData(user.id);
-        setNewRule({ keyword: '', category: '', ruleType: 'contains' });
-        setShowRulesModal(false);
-        alert('Rule created successfully!');
+        setNewRule({ pattern: '', category: '', priority: 1 });
+        setShowAddRule(false);
       } else {
-        alert('Failed to create rule');
+        setError(data.error || 'Failed to create rule');
       }
     } catch (error) {
       console.error('Error creating rule:', error);
-      alert('Failed to create rule');
+      setError('Failed to create rule');
     }
   };
 
   const handleDeleteRule = async (ruleId: string) => {
-    if (!confirm('Are you sure you want to delete this rule?')) return;
+    if (!user) return;
 
     try {
       const response = await fetch(`/api/categories/rules?ruleId=${ruleId}`, {
         method: 'DELETE',
       });
 
-      if (response.ok) {
-        if (user) {
-          await loadData(user.id);
-        }
-        alert('Rule deleted successfully!');
+      const data = await response.json();
+
+      if (data.success) {
+        await loadData(user.id);
       } else {
-        alert('Failed to delete rule');
+        setError(data.error || 'Failed to delete rule');
       }
     } catch (error) {
       console.error('Error deleting rule:', error);
-      alert('Failed to delete rule');
-    }
-  };
-
-  const handlePeriodChange = (period: string) => {
-    setSelectedPeriod(period);
-    if (period !== 'custom') {
-      setCustomStartDate('');
-      setCustomEndDate('');
+      setError('Failed to delete rule');
     }
   };
 
   if (loading) {
     return (
-      <Layout>
-        <div className="p-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-            <div className="h-48 bg-gray-200 rounded"></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="h-32 bg-gray-200 rounded"></div>
-              <div className="h-32 bg-gray-200 rounded"></div>
-            </div>
-          </div>
-        </div>
-      </Layout>
+      <div style={{ padding: '20px' }}>
+        <div className="loading">Loading categories...</div>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="p-4 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+    <div style={{ padding: '20px', gap: '24px', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div>
+        <h1 style={{ 
+          fontSize: '28px', 
+          fontWeight: '700', 
+          color: 'var(--text-primary)',
+          marginBottom: '8px'
+        }}>
+          Categories
+        </h1>
+        <p style={{ 
+          color: 'var(--text-secondary)',
+          fontSize: '16px'
+        }}>
+          Manage your spending categories and rules for {getPeriodLabel().toLowerCase()}
+        </p>
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="alert alert-error">
+          <AlertTriangle size={16} />
+          {error}
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="card">
+        <div className="card-header">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Categories</h1>
-            <p className="text-gray-600">Manage your spending categories and rules</p>
+            <h3 className="card-title">Quick Actions</h3>
+            <p className="card-subtitle">Manage categories and rules</p>
           </div>
         </div>
 
-        {/* Custom Date Range */}
-        {selectedPeriod === 'custom' && (
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <div className="flex space-x-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="border border-gray-300 rounded px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="border border-gray-300 rounded px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '12px' 
+        }}>
+          <button
+            onClick={() => setShowAddRule(true)}
+            className="btn btn-secondary"
+            style={{ 
+              padding: '16px',
+              flexDirection: 'column',
+              height: 'auto',
+              textAlign: 'center'
+            }}
+          >
+            <Plus size={24} style={{ marginBottom: '8px' }} />
+            <span>Add Rule</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Auto-categorization</span>
+          </button>
 
-        {/* Error Display */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">{error}</p>
-          </div>
-        )}
+          <button
+            onClick={() => router.push('/transactions')}
+            className="btn btn-secondary"
+            style={{ 
+              padding: '16px',
+              flexDirection: 'column',
+              height: 'auto',
+              textAlign: 'center'
+            }}
+          >
+            <Eye size={24} style={{ marginBottom: '8px' }} />
+            <span>View Transactions</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>See all transactions</span>
+          </button>
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <button 
-              onClick={() => setShowCategoryModal(true)}
-              className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-            >
-              <span className="text-2xl">📊</span>
-              <div className="text-left">
-                <p className="font-medium text-gray-900 text-sm">Add Category</p>
-                <p className="text-xs text-gray-600">Create new category</p>
-              </div>
-            </button>
-            
-            <button 
-              onClick={() => setShowRulesModal(true)}
-              className="flex items-center space-x-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-            >
-              <span className="text-2xl">⚙️</span>
-              <div className="text-left">
-                <p className="font-medium text-gray-900 text-sm">Add Rule</p>
-                <p className="text-xs text-gray-600">Auto-categorization</p>
-              </div>
-            </button>
-            
-            <button 
-              onClick={() => setShowCategoryList(!showCategoryList)}
-              className="flex items-center space-x-3 p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-            >
-              <span className="text-2xl">📝</span>
-              <div className="text-left">
-                <p className="font-medium text-gray-900 text-sm">Manage Categories</p>
-                <p className="text-xs text-gray-600">Edit & delete</p>
-              </div>
-            </button>
-            
-            <button 
-              onClick={() => router.push('/transactions')}
-              className="flex items-center space-x-3 p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
-            >
-              <span className="text-2xl">🎯</span>
-              <div className="text-left">
-                <p className="font-medium text-gray-900 text-sm">View Transactions</p>
-                <p className="text-xs text-gray-600">See all transactions</p>
-              </div>
-            </button>
+          <button
+            onClick={() => router.push('/budgets?add=true')}
+            className="btn btn-secondary"
+            style={{ 
+              padding: '16px',
+              flexDirection: 'column',
+              height: 'auto',
+              textAlign: 'center'
+            }}
+          >
+            <Target size={24} style={{ marginBottom: '8px' }} />
+            <span>Create Budget</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Set spending limits</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="card">
+        <div style={{ position: 'relative' }}>
+          <Search size={20} style={{ 
+            position: 'absolute', 
+            left: '12px', 
+            top: '50%', 
+            transform: 'translateY(-50%)',
+            color: 'var(--text-muted)'
+          }} />
+          <input
+            type="text"
+            placeholder="Search categories..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="input"
+            style={{ paddingLeft: '44px' }}
+          />
+        </div>
+      </div>
+
+      {/* Category Overview */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <h3 className="card-title">Category Overview</h3>
+            <p className="card-subtitle">
+              {filteredCategories.length} categories • {getPeriodLabel()}
+            </p>
           </div>
         </div>
 
-        {/* Category Management List */}
-        {showCategoryList && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h4 className="text-lg font-semibold text-gray-800 mb-4">Manage Categories</h4>
-            <div className="grid grid-cols-1 gap-3 max-h-64 overflow-y-auto">
-              {availableCategories.map((category) => {
-                const isDefault = [
-                  'Groceries', 'Transportation', 'Dining', 'Shopping', 'Bills', 
-                  'Entertainment', 'Healthcare', 'MobilePay', 'Convenience Stores',
-                  'Internal Transfer', 'Income', 'Uncategorized'
-                ].includes(category);
-                
-                return (
-                  <div key={category} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-lg">{getCategoryIcon(category)}</span>
-                      <span className="font-medium text-gray-900">{category}</span>
-                      {isDefault && (
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Default</span>
-                      )}
-                    </div>
-                    {!isDefault && (
-                      <button
-                        onClick={() => handleDeleteCategory(category)}
-                        className="text-red-500 hover:text-red-700 text-sm px-3 py-1 rounded hover:bg-red-50"
-                      >
-                        Delete
-                      </button>
-                    )}
+        {filteredCategories.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {filteredCategories.map((category) => (
+              <div key={category.category} className="card" style={{ 
+                padding: '20px',
+                backgroundColor: 'var(--bg-secondary)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--bg-card)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
+              }}
+              onClick={() => router.push(`/transactions?category=${encodeURIComponent(category.category)}`)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                  <div style={{ 
+                    width: '48px', 
+                    height: '48px', 
+                    backgroundColor: 'var(--bg-primary)',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: '16px'
+                  }}>
+                    <span style={{ fontSize: '24px' }}>{getCategoryIcon(category.category)}</span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Category Overview Grid */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-800">Category Overview</h3>
-            <div className="text-sm text-gray-500">
-              {selectedPeriod === 'all' ? 'All time' : 
-               selectedPeriod === 'custom' && customStartDate && customEndDate ? 
-               `${customStartDate} to ${customEndDate}` :
-               selectedPeriod.replace('_', ' ')}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 overflow-y-auto">
-            {Object.entries(getCategoryTotals())
-              .sort(([,a], [,b]) => b.amount - a.amount)
-              .map(([category, data]) => (
-                <div key={category} className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition-all cursor-pointer">
-                  <div className="text-center space-y-3">
-                    {/* Category Icon */}
-                    <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center ${getCategoryColor(category)}`}>
-                      <span className="text-2xl">{getCategoryIcon(category)}</span>
-                    </div>
-                    
-                    {/* Category Name */}
-                    <div>
-                      <h4 className="font-semibold text-gray-900 text-sm truncate">{category}</h4>
-                      <p className="text-xs text-gray-500">{data.count} transactions</p>
-                    </div>
-                    
-                    {/* Amount */}
-                    <div>
-                      <p className="text-lg font-bold text-gray-900">
-                        {formatCurrency(data.amount)}
-                      </p>
-                      <div className="flex items-center justify-center space-x-1">
-                        <span className={`text-xs ${data.trend >= 0 ? 'text-red-500' : 'text-green-500'}`}>
-                          {data.trend >= 0 ? '↗' : '↘'} {Math.abs(data.trend).toFixed(1)}%
+                  
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '4px' }}>
+                      <h4 style={{ 
+                        fontSize: '18px', 
+                        fontWeight: '600', 
+                        color: 'var(--text-primary)'
+                      }}>
+                        {category.category}
+                      </h4>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {getTrendIcon(category.trend)}
+                        <span style={{ 
+                          fontSize: '18px', 
+                          fontWeight: '700',
+                          color: 'var(--text-primary)'
+                        }}>
+                          {formatCurrency(Math.abs(category.total_amount))}
                         </span>
                       </div>
                     </div>
                     
-                    {/* Category Progress Bar */}
-                    <div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                          style={{ 
-                            width: `${Math.min((data.amount / Math.max(...Object.values(getCategoryTotals()).map(c => c.amount))) * 100, 100)}%` 
-                          }}
-                        />
-                      </div>
+                    <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '12px' }}>
+                      <span style={{ 
+                        fontSize: '14px', 
+                        color: 'var(--text-secondary)'
+                      }}>
+                        {category.transaction_count} transactions
+                      </span>
+                      <span style={{ 
+                        fontSize: '14px', 
+                        fontWeight: '600',
+                        color: 'var(--text-secondary)'
+                      }}>
+                        {category.percentage.toFixed(1)}% of total
+                      </span>
                     </div>
 
-                    {/* Quick Actions for Category */}
-                    <div className="flex flex-col space-y-2">
-                      <button
-                        onClick={() => router.push(`/transactions?category=${encodeURIComponent(category)}`)}
-                        className="text-xs bg-blue-100 text-blue-700 py-2 px-3 rounded hover:bg-blue-200 transition-colors"
-                      >
-                        View Transactions
-                      </button>
-                      <button
-                        onClick={() => router.push(`/budgets?add=true&category=${encodeURIComponent(category)}`)}
-                        className="text-xs bg-green-100 text-green-700 py-2 px-3 rounded hover:bg-green-200 transition-colors"
-                      >
-                        Set Budget
-                      </button>
+                    {/* Progress Bar */}
+                    <div className="progress">
+                      <div 
+                        className="progress-bar primary"
+                        style={{ width: `${getProgressBarWidth(category.percentage)}%` }}
+                      />
                     </div>
                   </div>
+
+                  <div style={{ marginLeft: '16px' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/budgets?add=true&category=${encodeURIComponent(category.category)}`);
+                      }}
+                      className="btn btn-ghost"
+                      style={{ padding: '8px' }}
+                    >
+                      <Target size={16} />
+                    </button>
+                  </div>
                 </div>
-              ))}
+              </div>
+            ))}
           </div>
-        </div>
-
-        {/* Rules Overview */}
-        {categorizationRules.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Active Rules</h3>
-              <button
-                onClick={() => setShowRulesModal(true)}
-                className="text-sm bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
-              >
-                Add Rule
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              {categorizationRules.slice(0, 5).map((rule) => (
-                <div key={rule.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-sm font-mono bg-gray-200 px-2 py-1 rounded">
-                      "{rule.keyword}"
-                    </span>
-                    <span className="text-sm text-gray-500">→</span>
-                    <span className={`text-sm px-2 py-1 rounded ${getCategoryColor(rule.category)}`}>
-                      {rule.category}
-                    </span>
-                    <span className="text-xs text-gray-400">({rule.rule_type})</span>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteRule(rule.id)}
-                    className="text-red-500 hover:text-red-700 text-sm"
-                  >
-                    Delete
-                  </button>
-                </div>
-              ))}
-              
-              {categorizationRules.length > 5 && (
-                <button
-                  onClick={() => setShowRulesModal(true)}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  View all {categorizationRules.length} rules
-                </button>
-              )}
-            </div>
+        ) : (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '40px',
+            color: 'var(--text-secondary)'
+          }}>
+            <BarChart3 size={48} style={{ margin: '0 auto 16px', color: 'var(--text-muted)' }} />
+            <p>No categories found</p>
           </div>
         )}
       </div>
 
-      {/* Category Creation Modal */}
-      {showCategoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md">
-            <div className="p-6 border-b">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">Create New Category</h3>
-                <button
-                  onClick={() => setShowCategoryModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category Name
-                </label>
-                <input
-                  type="text"
-                  value={newCategory.name}
-                  onChange={(e) => setNewCategory(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., 'Coffee Shops', 'Gym Membership'"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category Type
-                </label>
-                <select
-                  value={newCategory.type}
-                  onChange={(e) => setNewCategory(prev => ({ ...prev, type: e.target.value as 'expense' | 'income' }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900"
-                >
-                  <option value="expense">Expense</option>
-                  <option value="income">Income</option>
-                </select>
-              </div>
-            </div>
-            <div className="p-6 border-t bg-gray-50 rounded-b-xl">
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowCategoryModal(false)}
-                  className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg text-sm font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreateCategory}
-                  disabled={!newCategory.name.trim()}
-                  className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg text-sm font-medium disabled:bg-gray-400"
-                >
-                  Create Category
-                </button>
-              </div>
-            </div>
+      {/* Categorization Rules */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <h3 className="card-title">Categorization Rules</h3>
+            <p className="card-subtitle">Automatic transaction categorization</p>
           </div>
+          <button
+            onClick={() => setShowAddRule(true)}
+            className="btn btn-primary"
+          >
+            <Plus size={16} />
+            Add Rule
+          </button>
         </div>
-      )}
 
-      {/* Rules Creation Modal */}
-      {showRulesModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md">
-            <div className="p-6 border-b">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">Create Categorization Rule</h3>
+        {categoryRules.length > 0 ? (
+          <div>
+            {categoryRules.map((rule) => (
+              <div key={rule.id} className="list-item">
+                <div className="list-item-icon">
+                  <Settings size={20} />
+                </div>
+                <div className="list-item-content">
+                  <div className="list-item-title">
+                    Pattern: "{rule.pattern}"
+                  </div>
+                  <div className="list-item-subtitle">
+                    Category: {rule.category} • Priority: {rule.priority}
+                  </div>
+                </div>
                 <button
-                  onClick={() => setShowRulesModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  onClick={() => handleDeleteRule(rule.id)}
+                  className="btn btn-ghost"
+                  style={{ color: 'var(--accent-red)', padding: '8px' }}
                 >
-                  ✕
+                  <Trash2 size={16} />
                 </button>
               </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '40px',
+            color: 'var(--text-secondary)'
+          }}>
+            <Settings size={48} style={{ margin: '0 auto 16px', color: 'var(--text-muted)' }} />
+            <p>No categorization rules set up</p>
+            <p style={{ fontSize: '14px', marginTop: '8px' }}>
+              Add rules to automatically categorize transactions
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Add Rule Modal */}
+      {showAddRule && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                Add Categorization Rule
+              </h3>
+              <button
+                onClick={() => setShowAddRule(false)}
+                className="btn btn-ghost"
+                style={{ padding: '8px' }}
+              >
+                <X size={16} />
+              </button>
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Keyword
-                </label>
+            
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Pattern</label>
                 <input
                   type="text"
-                  value={newRule.keyword}
-                  onChange={(e) => setNewRule(prev => ({ ...prev, keyword: e.target.value }))}
-                  placeholder="e.g., 'netto', 'spotify', 'mobilepay'"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900"
+                  value={newRule.pattern}
+                  onChange={(e) => setNewRule(prev => ({ ...prev, pattern: e.target.value }))}
+                  placeholder="e.g., Netto, REMA, grocery"
+                  className="input"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Transactions containing this keyword will be automatically categorized
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Text pattern to match in transaction descriptions
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category
-                </label>
+              <div className="form-group">
+                <label className="form-label">Category</label>
                 <select
                   value={newRule.category}
                   onChange={(e) => setNewRule(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900"
+                  className="input"
                 >
-                  <option value="">Select a category</option>
-                  {availableCategories.map(category => (
-                    <option key={category} value={category}>{category}</option>
+                  <option value="">Select category</option>
+                  {categories.map(cat => (
+                    <option key={cat.category} value={cat.category}>
+                      {cat.category}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Rule Type
-                </label>
-                <select
-                  value={newRule.ruleType}
-                  onChange={(e) => setNewRule(prev => ({ ...prev, ruleType: e.target.value as any }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900"
-                >
-                  <option value="contains">Contains keyword</option>
-                  <option value="starts_with">Starts with keyword</option>
-                  <option value="ends_with">Ends with keyword</option>
-                  <option value="exact">Exact match</option>
-                </select>
+              <div className="form-group">
+                <label className="form-label">Priority</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={newRule.priority}
+                  onChange={(e) => setNewRule(prev => ({ ...prev, priority: parseInt(e.target.value) }))}
+                  className="input"
+                />
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Higher priority rules are applied first (1-10)
+                </p>
               </div>
-
-              {/* Show existing rules */}
-              {categorizationRules.length > 0 && (
-                <div className="border-t pt-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Existing Rules</h4>
-                  <div className="max-h-32 overflow-y-auto space-y-2">
-                    {categorizationRules.map((rule) => (
-                      <div key={rule.id} className="flex items-center justify-between bg-gray-50 rounded px-3 py-2">
-                        <div className="text-xs">
-                          <span className="font-medium">"{rule.keyword}"</span>
-                          <span className="text-gray-500"> → {rule.category}</span>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteRule(rule.id)}
-                          className="text-red-500 hover:text-red-700 text-xs"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
-            <div className="p-6 border-t bg-gray-50 rounded-b-xl">
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowRulesModal(false)}
-                  className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg text-sm font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreateRule}
-                  disabled={!newRule.keyword || !newRule.category}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium disabled:bg-gray-400"
-                >
-                  Create Rule
-                </button>
-              </div>
+
+            <div className="modal-footer">
+              <button
+                onClick={() => setShowAddRule(false)}
+                className="btn btn-secondary"
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateRule}
+                disabled={!newRule.pattern || !newRule.category}
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+              >
+                Create Rule
+              </button>
             </div>
           </div>
         </div>
       )}
-    </Layout>
+    </div>
   );
 }
