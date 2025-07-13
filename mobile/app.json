@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "WealthBuddy",
+    "slug": "wealthbuddy-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a1a"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.wealthbuddy.ai",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Use Face ID to authenticate securely into your financial dashboard",
+        "NSCameraUsageDescription": "Camera access is needed for document scanning features"
+      }
+    },
+    "android": {
+      "package": "com.wealthbuddy.ai",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a1a1a"
+      },
+      "permissions": [
+        "USE_FINGERPRINT",
+        "USE_BIOMETRIC",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "wealthbuddy-ai-mobile"
+      }
+    },
+    "owner": "wealthbuddy",
+    "privacy": "public",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "primaryColor": "#4a9eff",
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#4a9eff"
+    }
+  }
+}
