@@ -4,7 +4,7 @@ import { DatabaseService } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
-    const { bankId, userId } = await request.json();
+    const { bankId, userId, isMobile } = await request.json();
 
     if (!bankId || !DANISH_BANKS[bankId as BankId]) {
       return NextResponse.json(
@@ -36,13 +36,16 @@ export async function POST(request: NextRequest) {
     }
 
     const institutionId = DANISH_BANKS[bankId as BankId];
-    const redirectUrl = `${baseUrl}/api/nordigen/callback`;
+    const redirectUrl = isMobile ? 
+      `${baseUrl}/api/nordigen/mobile-callback` : 
+      `${baseUrl}/api/nordigen/callback`;
     const reference = `wealthbuddy-${Date.now()}`;
 
     console.log('Creating requisition with:', {
       institutionId,
       redirectUrl,
       reference,
+      isMobile,
       hasSecretId: !!process.env.NORDIGEN_SECRET_ID,
       hasSecretKey: !!process.env.NORDIGEN_SECRET_KEY,
     });

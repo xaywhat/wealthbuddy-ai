@@ -7,13 +7,15 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimePeriod } from '@/contexts/TimePeriodContext';
-import { financialAPI, transactionsAPI, insightsAPI } from '@/services/api';
+import { financialAPI, transactionsAPI, insightsAPI, accountsAPI } from '@/services/api';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, CATEGORY_ICONS } from '@/constants';
 import type { FinancialSummary, Transaction, AIInsight } from '@/types';
 
@@ -23,12 +25,22 @@ const HomeScreen = () => {
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [insights, setInsights] = useState<AIInsight[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Refresh data when screen comes into focus (e.g., returning from bank auth)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('HomeScreen focused, refreshing data...');
+      loadData();
+    }, [])
+  );
 
   const loadData = async () => {
     if (!user) return;
@@ -36,15 +48,52 @@ const HomeScreen = () => {
     try {
       const { startDate, endDate } = getDateRange();
       
-      const [summaryData, transactionsData, insightsData] = await Promise.all([
-        financialAPI.getSummary(user.id, undefined, startDate, endDate),
-        transactionsAPI.getTransactions(user.id, 5),
-        insightsAPI.getInsights(user.id, 3),
+      // Load data in parallel
+      const [accountsResult, summaryResult, transactionsResult, insightsResult] = await Promise.all([
+        accountsAPI.getAccounts(user.id).catch(err => {
+          console.error('Accounts API error:', err);
+          return { success: false, accounts: [] };
+        }),
+        financialAPI.getSummary(user.id, undefined, startDate, endDate).catch(err => {
+          console.error('Summary API error:', err);
+          return { success: false, summary: null };
+        }),
+        transactionsAPI.getTransactions(user.id, 5).catch(err => {
+          console.error('Transactions API error:', err);
+          return { success: false, transactions: [] };
+        }),
+        insightsAPI.getInsights(user.id, 3).catch(err => {
+          console.error('Insights API error:', err);
+          return { success: false, insights: [] };
+        }),
       ]);
 
-      setSummary(summaryData);
-      setRecentTransactions(transactionsData);
-      setInsights(insightsData);
+      // Extract accounts data
+      const accountsData = accountsResult?.success ? accountsResult.accounts : 
+                          accountsResult?.accounts || accountsResult || [];
+      const accountsArray = Array.isArray(accountsData) ? accountsData : [];
+      setAccounts(accountsArray);
+      setIsConnected(accountsArray.length > 0);
+
+      // Extract summary data
+      const summaryData = summaryResult?.success ? summaryResult.summary : 
+                          summaryResult?.summary || summaryResult;
+      if (summaryData && typeof summaryData === 'object') {
+        setSummary(summaryData);
+      }
+
+      // Extract transactions data
+      const transactionsData = transactionsResult?.success ? transactionsResult.transactions : 
+                               transactionsResult?.transactions || transactionsResult || [];
+      const transactionsArray = Array.isArray(transactionsData) ? transactionsData : [];
+      setRecentTransactions(transactionsArray);
+
+      // Extract insights data
+      const insightsData = insightsResult?.success ? insightsResult.insights : 
+                           insightsResult?.insights || insightsResult || [];
+      const insightsArray = Array.isArray(insightsData) ? insightsData : [];
+      setInsights(insightsArray);
+
     } catch (error) {
       console.error('Error loading home data:', error);
     } finally {
@@ -87,42 +136,40 @@ const HomeScreen = () => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.welcomeText}>Welcome back!</Text>
+          <Text style={styles.welcomeText}>Welcome back, {user?.keyphrase}!</Text>
           <Text style={styles.periodText}>{getPeriodLabel()}</Text>
         </View>
 
-        {/* Financial Summary Cards */}
-        {summary && (
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryRow}>
-                <View style={[styles.summaryItem, styles.incomeItem]}>
-                  <Ionicons name="trending-up" size={24} color={COLORS.accentGreen} />
-                  <Text style={styles.summaryLabel}>Income</Text>
-                  <Text style={[styles.summaryAmount, { color: COLORS.accentGreen }]}>
-                    {formatCurrency(summary.totalIncome)}
-                  </Text>
-                </View>
-                <View style={[styles.summaryItem, styles.expenseItem]}>
-                  <Ionicons name="trending-down" size={24} color={COLORS.accentRed} />
-                  <Text style={styles.summaryLabel}>Expenses</Text>
-                  <Text style={[styles.summaryAmount, { color: COLORS.accentRed }]}>
-                    {formatCurrency(summary.totalExpenses)}
-                  </Text>
-                </View>
+        {/* Financial Summary Cards - Always show */}
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryRow}>
+              <View style={[styles.summaryItem, styles.incomeItem]}>
+                <Ionicons name="trending-up" size={24} color={COLORS.accentGreen} />
+                <Text style={styles.summaryLabel}>Income</Text>
+                <Text style={[styles.summaryAmount, { color: COLORS.accentGreen }]}>
+                  {formatCurrency(summary?.totalIncome || 0)}
+                </Text>
               </View>
-              <View style={styles.netAmountContainer}>
-                <Text style={styles.netLabel}>Net Amount</Text>
-                <Text style={[
-                  styles.netAmount,
-                  { color: summary.netAmount >= 0 ? COLORS.accentGreen : COLORS.accentRed }
-                ]}>
-                  {formatCurrency(summary.netAmount)}
+              <View style={[styles.summaryItem, styles.expenseItem]}>
+                <Ionicons name="trending-down" size={24} color={COLORS.accentRed} />
+                <Text style={styles.summaryLabel}>Expenses</Text>
+                <Text style={[styles.summaryAmount, { color: COLORS.accentRed }]}>
+                  {formatCurrency(Math.abs(summary?.totalExpenses || 0))}
                 </Text>
               </View>
             </View>
+            <View style={styles.netAmountContainer}>
+              <Text style={styles.netLabel}>Net Amount</Text>
+              <Text style={[
+                styles.netAmount,
+                { color: (summary?.netAmount || 0) >= 0 ? COLORS.accentGreen : COLORS.accentRed }
+              ]}>
+                {formatCurrency(summary?.netAmount || 0)}
+              </Text>
+            </View>
           </View>
-        )}
+        </View>
 
         {/* AI Insights */}
         {insights.length > 0 && (
@@ -341,6 +388,58 @@ const styles = StyleSheet.create({
   transactionAmount: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
+  },
+  // Empty state styles
+  emptyStateContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING['2xl'],
+    paddingVertical: SPACING['5xl'],
+  },
+  emptyStateIcon: {
+    marginBottom: SPACING['2xl'],
+  },
+  emptyStateTitle: {
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  emptyStateSubtext: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: SPACING['3xl'],
+  },
+  connectButton: {
+    backgroundColor: COLORS.accentBlue,
+    paddingHorizontal: SPACING['2xl'],
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING['2xl'],
+  },
+  connectButtonText: {
+    color: COLORS.textPrimary,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    textAlign: 'center',
+  },
+  demoNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.bgCard,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.md,
+    marginTop: SPACING.lg,
+  },
+  demoNoteText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textMuted,
+    marginLeft: SPACING.sm,
+    flex: 1,
   },
 });
 
