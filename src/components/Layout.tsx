@@ -4,6 +4,24 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useTimePeriod } from '@/contexts/TimePeriodContext';
+import { 
+  Bell, 
+  Plus, 
+  Home, 
+  Target, 
+  Trophy, 
+  BarChart3, 
+  CreditCard, 
+  User, 
+  ChevronDown,
+  Calendar,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Settings,
+  LogOut,
+  Wallet
+} from 'lucide-react';
 
 interface User {
   id: string;
@@ -34,6 +52,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTimePeriodDropdown, setShowTimePeriodDropdown] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [loadingFinancialSummary, setLoadingFinancialSummary] = useState(false);
@@ -169,383 +188,424 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     setShowTimePeriodDropdown(false);
   };
 
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'achievement': return '🏆';
+      case 'mission': return '🎯';
+      case 'warning': return '⚠️';
+      case 'success': return '✅';
+      default: return 'ℹ️';
+    }
+  };
+
   // Only show financial summary and time selector on main app pages, not on login
   const shouldShowFinancialSummary = user && isConnected && pathname !== '/login' && pathname !== '/privacy-policy' && pathname !== '/terms-of-service';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Header */}
-      <header className="bg-white shadow-sm px-4 py-3 sticky top-0 z-40">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Link href="/" className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center">
-                <span className="text-lg">💰</span>
-              </div>
-              <h1 className="text-xl font-bold text-gray-900">WealthBuddy</h1>
-            </Link>
-            <span className="text-sm text-gray-500">• {getPageTitle()}</span>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            {/* Time Period Selector - Only show if user is connected */}
-            {shouldShowFinancialSummary && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowTimePeriodDropdown(!showTimePeriodDropdown)}
-                  className="flex items-center space-x-1 text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors"
-                >
-                  <span>{getPeriodLabel()}</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {/* Time Period Dropdown */}
-                {showTimePeriodDropdown && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                    <button
-                      onClick={() => handlePeriodChange('this_week')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      This Week
-                    </button>
-                    <button
-                      onClick={() => handlePeriodChange('last_week')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Last Week
-                    </button>
-                    <button
-                      onClick={() => handlePeriodChange('this_month')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      This Month
-                    </button>
-                    <button
-                      onClick={() => handlePeriodChange('last_month')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Last Month
-                    </button>
-                    <button
-                      onClick={() => handlePeriodChange('last_3_months')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Last 3 Months
-                    </button>
-                    <button
-                      onClick={() => handlePeriodChange('last_6_months')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Last 6 Months
-                    </button>
-                    <button
-                      onClick={() => handlePeriodChange('this_year')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      This Year
-                    </button>
-                    <button
-                      onClick={() => handlePeriodChange('last_year')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Last Year
-                    </button>
-                    <button
-                      onClick={() => handlePeriodChange('all')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      All Time
-                    </button>
-                    <div className="border-t border-gray-200 my-1"></div>
-                    <button
-                      onClick={() => handlePeriodChange('custom')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Custom Range
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Add Button */}
-            <div className="relative">
-              <button
-                onClick={() => setShowAddMenu(!showAddMenu)}
-                className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-lg hover:bg-blue-700 transition-colors"
-              >
-                +
-              </button>
-              
-              {/* Add Menu Dropdown */}
-              {showAddMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                  <Link
-                    href="/transactions?add=true"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setShowAddMenu(false)}
-                  >
-                    📝 Add Transaction
-                  </Link>
-                  <Link
-                    href="/budgets?add=true"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setShowAddMenu(false)}
-                  >
-                    🎯 Create Budget
-                  </Link>
-                  <Link
-                    href="/goals?add=true"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setShowAddMenu(false)}
-                  >
-                    🏆 Set Goal
-                  </Link>
-                  <Link
-                    href="/categories?add=true"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setShowAddMenu(false)}
-                  >
-                    📊 Add Category
-                  </Link>
+      <header className="glass-card-dark sticky top-0 z-40 border-b border-white/10">
+        <div className="px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Link href="/" className="flex items-center space-x-3 group">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300">
+                  <Wallet className="w-6 h-6 text-white" />
                 </div>
-              )}
+                <div>
+                  <h1 className="text-xl font-bold gradient-text">WealthBuddy</h1>
+                  <p className="text-xs text-gray-400">{getPageTitle()}</p>
+                </div>
+              </Link>
             </div>
+            
+            <div className="flex items-center space-x-3">
+              {/* Time Period Selector - Only show if user is connected */}
+              {shouldShowFinancialSummary && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowTimePeriodDropdown(!showTimePeriodDropdown)}
+                    className="flex items-center space-x-2 glass-card px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-white/10 transition-all duration-300"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>{getPeriodLabel()}</span>
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
 
-            {/* Notifications Button */}
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center relative hover:bg-gray-200 transition-colors"
-              >
-                <span className="text-lg">🔔</span>
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Notifications Dropdown */}
-              {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 max-h-96 overflow-y-auto z-50">
-                  <div className="p-3 border-b border-gray-200">
-                    <h3 className="font-semibold text-gray-900">Notifications</h3>
-                  </div>
-                  
-                  {notifications.length > 0 ? (
-                    <div className="py-1">
-                      {notifications.slice(0, 10).map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`px-4 py-3 hover:bg-gray-50 cursor-pointer ${
-                            !notification.read ? 'bg-blue-50' : ''
+                  {/* Time Period Dropdown */}
+                  {showTimePeriodDropdown && (
+                    <div className="absolute right-0 mt-2 w-56 glass-card rounded-xl shadow-xl border border-white/10 py-2 z-50">
+                      {[
+                        { key: 'this_week', label: 'This Week' },
+                        { key: 'last_week', label: 'Last Week' },
+                        { key: 'this_month', label: 'This Month' },
+                        { key: 'last_month', label: 'Last Month' },
+                        { key: 'last_3_months', label: 'Last 3 Months' },
+                        { key: 'last_6_months', label: 'Last 6 Months' },
+                        { key: 'this_year', label: 'This Year' },
+                        { key: 'last_year', label: 'Last Year' },
+                        { key: 'all', label: 'All Time' },
+                        { key: 'custom', label: 'Custom Range' }
+                      ].map((period) => (
+                        <button
+                          key={period.key}
+                          onClick={() => handlePeriodChange(period.key)}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-white/10 transition-colors ${
+                            selectedPeriod === period.key ? 'bg-white/10 text-blue-400' : 'text-white'
                           }`}
-                          onClick={() => markNotificationAsRead(notification.id)}
                         >
-                          <div className="flex items-start space-x-3">
-                            <span className="text-lg">
-                              {notification.type === 'achievement' ? '🏆' : 
-                               notification.type === 'mission' ? '🎯' : 
-                               notification.type === 'warning' ? '⚠️' : 
-                               notification.type === 'success' ? '✅' : 'ℹ️'}
-                            </span>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-gray-900">
-                                {notification.title}
-                              </p>
-                              <p className="text-xs text-gray-600 mt-1">
-                                {notification.message}
-                              </p>
-                              <p className="text-xs text-gray-400 mt-1">
-                                {new Date(notification.created_at).toLocaleDateString('da-DK')}
-                              </p>
-                            </div>
-                            {!notification.read && (
-                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                            )}
-                          </div>
-                        </div>
+                          {period.label}
+                        </button>
                       ))}
                     </div>
-                  ) : (
-                    <div className="p-4 text-center text-gray-500">
-                      <span className="text-lg">📭</span>
-                      <p className="text-sm mt-2">No notifications</p>
-                    </div>
-                  )}
-                  
-                  {notifications.length > 10 && (
-                    <div className="p-3 border-t border-gray-200">
-                      <Link
-                        href="/notifications"
-                        className="text-sm text-blue-600 hover:text-blue-800"
-                        onClick={() => setShowNotifications(false)}
-                      >
-                        View all notifications
-                      </Link>
-                    </div>
                   )}
                 </div>
               )}
-            </div>
 
-            {/* Profile Button */}
-            {user ? (
-              <Link
-                href="/profile"
-                className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm hover:bg-blue-700 transition-colors"
-              >
-                {user.keyphrase?.charAt(0).toUpperCase() || 'U'}
-              </Link>
-            ) : (
-              <Link
-                href="/login"
-                className="text-sm bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Login
-              </Link>
-            )}
+              {/* Add Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowAddMenu(!showAddMenu)}
+                  className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+                
+                {/* Add Menu Dropdown */}
+                {showAddMenu && (
+                  <div className="absolute right-0 mt-2 w-56 glass-card rounded-xl shadow-xl border border-white/10 py-2 z-50">
+                    <Link
+                      href="/transactions?add=true"
+                      className="flex items-center space-x-3 px-4 py-3 text-sm text-white hover:bg-white/10 transition-colors"
+                      onClick={() => setShowAddMenu(false)}
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      <span>Add Transaction</span>
+                    </Link>
+                    <Link
+                      href="/budgets?add=true"
+                      className="flex items-center space-x-3 px-4 py-3 text-sm text-white hover:bg-white/10 transition-colors"
+                      onClick={() => setShowAddMenu(false)}
+                    >
+                      <Target className="w-4 h-4" />
+                      <span>Create Budget</span>
+                    </Link>
+                    <Link
+                      href="/goals?add=true"
+                      className="flex items-center space-x-3 px-4 py-3 text-sm text-white hover:bg-white/10 transition-colors"
+                      onClick={() => setShowAddMenu(false)}
+                    >
+                      <Trophy className="w-4 h-4" />
+                      <span>Set Goal</span>
+                    </Link>
+                    <Link
+                      href="/categories?add=true"
+                      className="flex items-center space-x-3 px-4 py-3 text-sm text-white hover:bg-white/10 transition-colors"
+                      onClick={() => setShowAddMenu(false)}
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      <span>Add Category</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* Notifications Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="w-10 h-10 glass-card rounded-xl flex items-center justify-center text-white hover:bg-white/10 transition-all duration-300 relative"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Notifications Dropdown */}
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-80 glass-card rounded-xl shadow-xl border border-white/10 max-h-96 overflow-y-auto z-50">
+                    <div className="p-4 border-b border-white/10">
+                      <h3 className="font-semibold text-white">Notifications</h3>
+                    </div>
+                    
+                    {notifications.length > 0 ? (
+                      <div className="py-2">
+                        {notifications.slice(0, 10).map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={`px-4 py-3 hover:bg-white/5 cursor-pointer transition-colors ${
+                              !notification.read ? 'bg-blue-500/10' : ''
+                            }`}
+                            onClick={() => markNotificationAsRead(notification.id)}
+                          >
+                            <div className="flex items-start space-x-3">
+                              <span className="text-lg">
+                                {getNotificationIcon(notification.type)}
+                              </span>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-white">
+                                  {notification.title}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  {notification.message}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {new Date(notification.created_at).toLocaleDateString('da-DK')}
+                                </p>
+                              </div>
+                              {!notification.read && (
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-6 text-center text-gray-400">
+                        <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No notifications</p>
+                      </div>
+                    )}
+                    
+                    {notifications.length > 10 && (
+                      <div className="p-4 border-t border-white/10">
+                        <Link
+                          href="/notifications"
+                          className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                          onClick={() => setShowNotifications(false)}
+                        >
+                          View all notifications
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Profile Button */}
+              {user ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                    className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  >
+                    {user.keyphrase?.charAt(0).toUpperCase() || 'U'}
+                  </button>
+
+                  {/* Profile Menu Dropdown */}
+                  {showProfileMenu && (
+                    <div className="absolute right-0 mt-2 w-56 glass-card rounded-xl shadow-xl border border-white/10 py-2 z-50">
+                      <div className="px-4 py-3 border-b border-white/10">
+                        <p className="text-sm font-medium text-white">{user.keyphrase}</p>
+                        <p className="text-xs text-gray-400">Premium User</p>
+                      </div>
+                      <Link
+                        href="/profile"
+                        className="flex items-center space-x-3 px-4 py-3 text-sm text-white hover:bg-white/10 transition-colors"
+                        onClick={() => setShowProfileMenu(false)}
+                      >
+                        <User className="w-4 h-4" />
+                        <span>Profile Settings</span>
+                      </Link>
+                      <Link
+                        href="/settings"
+                        className="flex items-center space-x-3 px-4 py-3 text-sm text-white hover:bg-white/10 transition-colors"
+                        onClick={() => setShowProfileMenu(false)}
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span>App Settings</span>
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="flex items-center space-x-3 px-4 py-3 text-sm text-red-400 hover:bg-white/10 transition-colors w-full text-left"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link
+                  href="/login"
+                  className="btn-primary text-sm"
+                >
+                  Sign In
+                </Link>
+              )}
+            </div>
           </div>
+
+          {/* Financial Summary Bar */}
+          {shouldShowFinancialSummary && (
+            <div className="mt-4">
+              {loadingFinancialSummary ? (
+                <div className="glass-card rounded-xl px-4 py-3">
+                  <div className="flex items-center justify-center">
+                    <div className="loading-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                    <span className="ml-2 text-sm text-gray-400">Loading financial data...</span>
+                  </div>
+                </div>
+              ) : financialSummary ? (
+                <div className="glass-card rounded-xl px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-6">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                          <TrendingUp className="w-4 h-4 text-green-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Income</p>
+                          <p className="text-sm font-semibold text-green-400">
+                            {formatCurrency(financialSummary.totalIncome)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
+                          <TrendingDown className="w-4 h-4 text-red-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Expenses</p>
+                          <p className="text-sm font-semibold text-red-400">
+                            {formatCurrency(Math.abs(financialSummary.totalExpenses))}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        financialSummary.netAmount >= 0 ? 'bg-blue-500/20' : 'bg-red-500/20'
+                      }`}>
+                        <DollarSign className={`w-4 h-4 ${
+                          financialSummary.netAmount >= 0 ? 'text-blue-400' : 'text-red-400'
+                        }`} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">Net Amount</p>
+                        <p className={`text-sm font-bold ${
+                          financialSummary.netAmount >= 0 ? 'text-blue-400' : 'text-red-400'
+                        }`}>
+                          {formatCurrency(financialSummary.netAmount)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* Custom Date Range Input */}
+          {shouldShowFinancialSummary && selectedPeriod === 'custom' && (
+            <div className="mt-3 glass-card rounded-xl px-4 py-3">
+              <div className="flex space-x-4 items-center">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-400 mb-2">From Date</label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="modern-input w-full"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-400 mb-2">To Date</label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="modern-input w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-
-        {/* Financial Summary Bar */}
-        {shouldShowFinancialSummary && (
-          <div className="mt-3">
-            {loadingFinancialSummary ? (
-              <div className="flex items-center justify-center text-xs bg-gray-50 rounded-lg px-3 py-2">
-                <div className="animate-pulse flex space-x-4 w-full">
-                  <div className="h-3 bg-gray-200 rounded w-1/4"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/4"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/4"></div>
-                </div>
-              </div>
-            ) : financialSummary ? (
-              <div className="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-2">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-1">
-                    <span className="text-green-600">📈</span>
-                    <span className="text-gray-600">Income:</span>
-                    <span className="font-semibold text-green-600">
-                      {formatCurrency(financialSummary.totalIncome)}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <span className="text-red-600">📉</span>
-                    <span className="text-gray-600">Expenses:</span>
-                    <span className="font-semibold text-red-600">
-                      {formatCurrency(Math.abs(financialSummary.totalExpenses))}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <span className="text-gray-600">Net:</span>
-                  <span className={`font-bold ${financialSummary.netAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(financialSummary.netAmount)}
-                  </span>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {/* Custom Date Range Input */}
-        {shouldShowFinancialSummary && selectedPeriod === 'custom' && (
-          <div className="mt-3 bg-gray-50 rounded-lg px-3 py-2">
-            <div className="flex space-x-3 items-center">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">From</label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="border border-gray-300 rounded px-2 py-1 text-xs"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">To</label>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="border border-gray-300 rounded px-2 py-1 text-xs"
-                />
-              </div>
-            </div>
-          </div>
-        )}
       </header>
 
       {/* Main Content */}
-      <main className="pb-20">
+      <main className="pb-24">
         {children}
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 z-30">
+      <nav className="fixed bottom-0 left-0 right-0 glass-card-dark border-t border-white/10 px-4 py-3 z-30">
         <div className="flex justify-around items-center">
           <Link
             href="/budgets"
-            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
-              pathname === '/budgets' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900'
+            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-xl transition-all duration-300 ${
+              pathname === '/budgets' 
+                ? 'bg-blue-500/20 text-blue-400 shadow-glow' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <span className="text-xl">🎯</span>
+            <Target className="w-5 h-5" />
             <span className="text-xs font-medium">Budgets</span>
           </Link>
 
           <Link
             href="/goals"
-            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
-              pathname === '/goals' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900'
+            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-xl transition-all duration-300 ${
+              pathname === '/goals' 
+                ? 'bg-blue-500/20 text-blue-400 shadow-glow' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <span className="text-xl">🏆</span>
+            <Trophy className="w-5 h-5" />
             <span className="text-xs font-medium">Goals</span>
           </Link>
 
           <Link
             href="/"
-            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
-              pathname === '/' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900'
+            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-xl transition-all duration-300 ${
+              pathname === '/' 
+                ? 'bg-blue-500/20 text-blue-400 shadow-glow' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <span className="text-xl">🏠</span>
+            <Home className="w-5 h-5" />
             <span className="text-xs font-medium">Home</span>
           </Link>
 
           <Link
             href="/categories"
-            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
-              pathname === '/categories' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900'
+            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-xl transition-all duration-300 ${
+              pathname === '/categories' 
+                ? 'bg-blue-500/20 text-blue-400 shadow-glow' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <span className="text-xl">📊</span>
+            <BarChart3 className="w-5 h-5" />
             <span className="text-xs font-medium">Categories</span>
           </Link>
 
           <Link
             href="/transactions"
-            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
-              pathname === '/transactions' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:text-gray-900'
+            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-xl transition-all duration-300 ${
+              pathname === '/transactions' 
+                ? 'bg-blue-500/20 text-blue-400 shadow-glow' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <span className="text-xl">💳</span>
+            <CreditCard className="w-5 h-5" />
             <span className="text-xs font-medium">Transactions</span>
           </Link>
         </div>
       </nav>
 
       {/* Click outside handlers */}
-      {(showNotifications || showAddMenu || showTimePeriodDropdown) && (
+      {(showNotifications || showAddMenu || showTimePeriodDropdown || showProfileMenu) && (
         <div
           className="fixed inset-0 z-20"
           onClick={() => {
             setShowNotifications(false);
             setShowAddMenu(false);
             setShowTimePeriodDropdown(false);
+            setShowProfileMenu(false);
           }}
         />
       )}

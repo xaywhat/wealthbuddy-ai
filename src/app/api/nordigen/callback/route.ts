@@ -13,15 +13,15 @@ export async function GET(request: NextRequest) {
     const error = searchParams.get('error');
 
     if (error) {
-      // Redirect to dashboard with error
+      // Redirect to homepage with error
       return NextResponse.redirect(
-        `${baseUrl}/dashboard?error=bank_connection_failed`
+        `${baseUrl}/?error=bank_connection_failed`
       );
     }
 
     if (!ref) {
       return NextResponse.redirect(
-        `${baseUrl}/dashboard?error=missing_reference`
+        `${baseUrl}/?error=missing_reference`
       );
     }
 
@@ -30,19 +30,19 @@ export async function GET(request: NextRequest) {
       // We need to get all requisitions and find the one with matching reference
       // For now, we'll pass the reference and handle the lookup in the accounts endpoint
       return NextResponse.redirect(
-        `${baseUrl}/dashboard?ref=${ref}&status=connected`
+        `${baseUrl}/?ref=${ref}&status=connected`
       );
     } catch (lookupError) {
       console.error('Error looking up requisition:', lookupError);
       return NextResponse.redirect(
-        `${baseUrl}/dashboard?error=requisition_lookup_failed`
+        `${baseUrl}/?error=requisition_lookup_failed`
       );
     }
 
   } catch (error) {
     console.error('Error in Nordigen callback:', error);
     return NextResponse.redirect(
-      `${baseUrl}/dashboard?error=callback_failed`
+      `${baseUrl}/?error=callback_failed`
     );
   }
 }

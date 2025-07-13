@@ -5,6 +5,30 @@ import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Link from 'next/link';
 import { useTimePeriod } from '@/contexts/TimePeriodContext';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  DollarSign, 
+  CreditCard, 
+  Target, 
+  Trophy, 
+  Zap,
+  ArrowUpRight,
+  ArrowDownRight,
+  Plus,
+  Brain,
+  Calendar,
+  PieChart,
+  BarChart3,
+  Wallet,
+  Star,
+  Award,
+  ShoppingBag,
+  Coffee,
+  Car,
+  Home as HomeIcon,
+  ChevronRight
+} from 'lucide-react';
 
 interface User {
   id: string;
@@ -223,27 +247,28 @@ export default function HomePage() {
   };
 
   const getTransactionColor = (amount: number) => {
-    return amount >= 0 ? 'text-green-600' : 'text-red-600';
+    return amount >= 0 ? 'text-green-400' : 'text-red-400';
   };
 
   const getCategoryIcon = (category: string) => {
-    const icons: Record<string, string> = {
-      'Internal Transfer': '🔄',
-      'MobilePay': '📱',
-      'Convenience Stores': '🏪',
-      'Bills': '📄',
-      'Gas': '⛽',
-      'Groceries': '🛒',
-      'Transport': '🚌',
-      'Entertainment': '🎬',
-      'Dining': '🍽️',
-      'Shopping': '🛍️',
-      'Healthcare': '🏥',
-      'Income': '💰',
-      'Subscriptions': '📺',
-      'Uncategorized': '❓',
+    const iconMap: Record<string, any> = {
+      'Internal Transfer': ArrowUpRight,
+      'MobilePay': CreditCard,
+      'Convenience Stores': ShoppingBag,
+      'Bills': HomeIcon,
+      'Gas': Car,
+      'Groceries': ShoppingBag,
+      'Transport': Car,
+      'Entertainment': Star,
+      'Dining': Coffee,
+      'Shopping': ShoppingBag,
+      'Healthcare': Plus,
+      'Income': TrendingUp,
+      'Subscriptions': Calendar,
+      'Uncategorized': BarChart3,
     };
-    return icons[category] || '📊';
+    const IconComponent = iconMap[category] || BarChart3;
+    return <IconComponent className="w-4 h-4" />;
   };
 
   const getEffectiveCategory = (transaction: Transaction): string => {
@@ -253,15 +278,15 @@ export default function HomePage() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-4 space-y-4">
-          {/* Loading skeleton */}
-          <div className="animate-pulse space-y-4">
-            <div className="h-32 bg-gray-200 rounded-xl"></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="h-24 bg-gray-200 rounded-lg"></div>
-              <div className="h-24 bg-gray-200 rounded-lg"></div>
+        <div className="p-6 space-y-6">
+          {/* Loading skeleton with dark theme */}
+          <div className="space-y-6">
+            <div className="glass-card h-40 loading-pulse"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="glass-card h-32 loading-pulse"></div>
+              <div className="glass-card h-32 loading-pulse"></div>
             </div>
-            <div className="h-48 bg-gray-200 rounded-xl"></div>
+            <div className="glass-card h-60 loading-pulse"></div>
           </div>
         </div>
       </Layout>
@@ -271,20 +296,23 @@ export default function HomePage() {
   if (!isConnected) {
     return (
       <Layout>
-        <div className="p-4">
-          <div className="bg-white rounded-xl shadow-sm p-6 text-center">
-            <div className="text-6xl mb-4">🏦</div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+        <div className="p-6">
+          <div className="glass-card p-8 text-center max-w-md mx-auto">
+            <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Wallet className="w-10 h-10 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-3">
               Welcome to WealthBuddy!
             </h2>
-            <p className="text-gray-600 mb-6">
-              Connect your Danish bank account to start tracking your finances with AI-powered insights.
+            <p className="text-gray-400 mb-8 leading-relaxed">
+              Connect your Danish bank account to start tracking your finances with AI-powered insights and smart budgeting tools.
             </p>
             <Link
               href="/dashboard"
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              className="btn-primary inline-flex items-center space-x-2"
             >
-              Connect Bank Account
+              <CreditCard className="w-5 h-5" />
+              <span>Connect Bank Account</span>
             </Link>
           </div>
         </div>
@@ -294,115 +322,120 @@ export default function HomePage() {
 
   return (
     <Layout>
-      <div className="p-4 space-y-6">
-        {/* Welcome Section */}
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl p-5 text-white shadow-lg">
+      <div className="p-6 space-y-8">
+        {/* Welcome Hero Section */}
+        <div className="glass-card p-8">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold mb-1">
-                Welcome back, {user?.keyphrase}! 👋
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-white mb-2">
+                Welcome back, <span className="gradient-text">{user?.keyphrase}</span>! 👋
               </h1>
-              <p className="text-blue-100 text-sm">
+              <p className="text-gray-400 text-lg mb-6">
                 Here's your financial overview for {getPeriodLabel().toLowerCase()}
               </p>
+              
+              {/* Quick Stats */}
+              {financialSummary && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="glass-card p-6 bg-green-500/10 border-green-500/20">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center">
+                        <TrendingUp className="w-6 h-6 text-green-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-green-400">Total Income</h3>
+                        <p className="text-xs text-gray-400">{getPeriodLabel()}</p>
+                      </div>
+                    </div>
+                    <p className="text-2xl font-bold text-green-400">
+                      {formatCurrency(financialSummary.totalIncome)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-6 bg-red-500/10 border-red-500/20">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center">
+                        <TrendingDown className="w-6 h-6 text-red-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-red-400">Total Expenses</h3>
+                        <p className="text-xs text-gray-400">{getPeriodLabel()}</p>
+                      </div>
+                    </div>
+                    <p className="text-2xl font-bold text-red-400">
+                      {formatCurrency(Math.abs(financialSummary.totalExpenses))}
+                    </p>
+                  </div>
+
+                  <div className={`glass-card p-6 ${
+                    financialSummary.netAmount >= 0 
+                      ? 'bg-blue-500/10 border-blue-500/20' 
+                      : 'bg-red-500/10 border-red-500/20'
+                  }`}>
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                        financialSummary.netAmount >= 0 ? 'bg-blue-500/20' : 'bg-red-500/20'
+                      }`}>
+                        <DollarSign className={`w-6 h-6 ${
+                          financialSummary.netAmount >= 0 ? 'text-blue-400' : 'text-red-400'
+                        }`} />
+                      </div>
+                      <div>
+                        <h3 className={`text-sm font-semibold ${
+                          financialSummary.netAmount >= 0 ? 'text-blue-400' : 'text-red-400'
+                        }`}>Net Worth</h3>
+                        <p className="text-xs text-gray-400">Overall position</p>
+                      </div>
+                    </div>
+                    <p className={`text-2xl font-bold ${
+                      financialSummary.netAmount >= 0 ? 'text-blue-400' : 'text-red-400'
+                    }`}>
+                      {formatCurrency(financialSummary.netAmount)}
+                    </p>
+                    <div className="mt-3">
+                      <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                        financialSummary.netAmount >= 0 
+                          ? 'bg-blue-500/20 text-blue-400' 
+                          : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {financialSummary.netAmount >= 0 ? '💰 Positive' : '⚠️ Negative'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="hidden sm:block">
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
+            
+            <div className="hidden lg:block ml-8">
+              <div className="w-32 h-32 bg-gradient-to-r from-blue-500/20 to-purple-600/20 rounded-full flex items-center justify-center">
+                <PieChart className="w-16 h-16 text-blue-400" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Financial Summary Cards */}
-        {financialSummary && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-700">Income</span>
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-green-700 mb-1">
-                {formatCurrency(financialSummary.totalIncome)}
-              </p>
-              <p className="text-xs text-green-600 font-medium">{getPeriodLabel()}</p>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-red-100">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                    </svg>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-700">Expenses</span>
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-red-700 mb-1">
-                {formatCurrency(financialSummary.totalExpenses)}
-              </p>
-              <p className="text-xs text-red-600 font-medium">{getPeriodLabel()}</p>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm col-span-2 border-2 border-blue-200">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    financialSummary.netAmount >= 0 ? 'bg-green-100' : 'bg-red-100'
-                  }`}>
-                    <svg className={`w-6 h-6 ${financialSummary.netAmount >= 0 ? 'text-green-600' : 'text-red-600'}`} 
-                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <span className="text-base font-semibold text-gray-700">Net Amount</span>
-                    <p className="text-xs text-gray-500">Overall financial position</p>
-                  </div>
-                </div>
-              </div>
-              <p className={`text-3xl font-bold mb-2 ${financialSummary.netAmount >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                {formatCurrency(financialSummary.netAmount)}
-              </p>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">
-                  {financialSummary.transactionCount} transactions for {getPeriodLabel().toLowerCase()}
-                </p>
-                <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-                  financialSummary.netAmount >= 0 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {financialSummary.netAmount >= 0 ? '💰 Positive' : '⚠️ Negative'}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Account Balance Summary */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">Account Balance</h3>
-            <Link href="/dashboard" className="text-sm text-blue-600 hover:text-blue-800">
-              View Details
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                <Wallet className="w-5 h-5 text-blue-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-white">Account Balance</h3>
+            </div>
+            <Link 
+              href="/dashboard" 
+              className="btn-secondary text-sm inline-flex items-center space-x-2"
+            >
+              <span>View Details</span>
+              <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
           <div className="text-center">
-            <p className="text-3xl font-bold text-gray-900">
+            <p className="text-4xl font-bold gradient-text mb-2">
               {formatCurrency(bankAccounts.reduce((sum, acc) => sum + acc.balance, 0))}
             </p>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-gray-400">
               Across {bankAccounts.length} account{bankAccounts.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -410,44 +443,56 @@ export default function HomePage() {
 
         {/* Budget Progress */}
         {budgets.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Budget Progress</h3>
-              <Link href="/budgets" className="text-sm text-blue-600 hover:text-blue-800">
-                View All
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center">
+                  <Target className="w-5 h-5 text-green-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white">Budget Progress</h3>
+              </div>
+              <Link 
+                href="/budgets" 
+                className="btn-secondary text-sm inline-flex items-center space-x-2"
+              >
+                <span>View All</span>
+                <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {budgets.slice(0, 3).map((budget) => {
                 const percentage = (budget.spent / budget.amount) * 100;
                 const isOverBudget = percentage > 100;
                 const isNearLimit = percentage > budget.alert_threshold * 100;
 
                 return (
-                  <div key={budget.id} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">{budget.name}</span>
-                      <span className="text-sm text-gray-500">
-                        {formatCurrency(budget.spent)} / {formatCurrency(budget.amount)}
-                      </span>
+                  <div key={budget.id} className="glass-card p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-semibold text-white">{budget.name}</h4>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-400">
+                          {formatCurrency(budget.spent)} / {formatCurrency(budget.amount)}
+                        </p>
+                        <p className={`text-xs font-medium ${
+                          isOverBudget ? 'text-red-400' : isNearLimit ? 'text-yellow-400' : 'text-green-400'
+                        }`}>
+                          {percentage.toFixed(1)}% used
+                        </p>
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="progress-bar">
                       <div
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          isOverBudget ? 'bg-red-500' :
-                          isNearLimit ? 'bg-yellow-500' : 'bg-green-500'
+                        className={`progress-fill ${
+                          isOverBudget ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                          isNearLimit ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' : 
+                          'bg-gradient-to-r from-green-500 to-green-600'
                         }`}
                         style={{ width: `${Math.min(percentage, 100)}%` }}
                       />
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className={`text-xs ${isOverBudget ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
-                        {percentage.toFixed(1)}% used
-                      </span>
-                      {isOverBudget && (
-                        <span className="text-xs text-red-600">Over budget!</span>
-                      )}
-                    </div>
+                    {isOverBudget && (
+                      <p className="text-xs text-red-400 mt-2 font-medium">⚠️ Over budget!</p>
+                    )}
                   </div>
                 );
               })}
@@ -457,40 +502,49 @@ export default function HomePage() {
 
         {/* Goals Progress */}
         {goals.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Financial Goals</h3>
-              <Link href="/goals" className="text-sm text-blue-600 hover:text-blue-800">
-                View All
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                  <Trophy className="w-5 h-5 text-purple-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white">Financial Goals</h3>
+              </div>
+              <Link 
+                href="/goals" 
+                className="btn-secondary text-sm inline-flex items-center space-x-2"
+              >
+                <span>View All</span>
+                <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {goals.slice(0, 3).map((goal) => {
                 const percentage = (goal.current_amount / goal.target_amount) * 100;
                 const daysLeft = Math.ceil((new Date(goal.target_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
 
                 return (
-                  <div key={goal.id} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">{goal.name}</span>
-                      <span className="text-sm text-gray-500">
-                        {formatCurrency(goal.current_amount)} / {formatCurrency(goal.target_amount)}
-                      </span>
+                  <div key={goal.id} className="glass-card p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-semibold text-white">{goal.name}</h4>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-400">
+                          {formatCurrency(goal.current_amount)} / {formatCurrency(goal.target_amount)}
+                        </p>
+                        <p className="text-xs font-medium text-purple-400">
+                          {percentage.toFixed(1)}% complete
+                        </p>
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="progress-bar">
                       <div
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                        className="progress-fill bg-gradient-to-r from-purple-500 to-purple-600"
                         style={{ width: `${Math.min(percentage, 100)}%` }}
                       />
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-blue-600">
-                        {percentage.toFixed(1)}% complete
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {daysLeft > 0 ? `${daysLeft} days left` : 'Overdue'}
-                      </span>
-                    </div>
+                    <p className="text-xs text-gray-400 mt-2">
+                      {daysLeft > 0 ? `${daysLeft} days left` : 'Overdue'}
+                    </p>
                   </div>
                 );
               })}
@@ -500,23 +554,39 @@ export default function HomePage() {
 
         {/* AI Insights */}
         {aiInsights.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">AI Insights</h3>
-              <Link href="/insights" className="text-sm text-blue-600 hover:text-blue-800">
-                View All
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center">
+                  <Brain className="w-5 h-5 text-yellow-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white">AI Insights</h3>
+              </div>
+              <Link 
+                href="/insights" 
+                className="btn-secondary text-sm inline-flex items-center space-x-2"
+              >
+                <span>View All</span>
+                <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {aiInsights.slice(0, 2).map((insight, index) => (
-                <div key={index} className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
-                  <h4 className="text-sm font-medium text-gray-900">{insight.title}</h4>
-                  <p className="text-sm text-gray-700 mt-1">{insight.description}</p>
-                  {insight.potentialSavings > 0 && (
-                    <p className="text-sm font-medium text-yellow-700 mt-2">
-                      💰 Save {formatCurrency(insight.potentialSavings)} per {insight.timeframe}
-                    </p>
-                  )}
+                <div key={index} className="glass-card bg-yellow-500/10 border-yellow-500/20 p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-8 h-8 bg-yellow-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Zap className="w-4 h-4 text-yellow-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-yellow-400 mb-1">{insight.title}</h4>
+                      <p className="text-sm text-gray-300 mb-2">{insight.description}</p>
+                      {insight.potentialSavings > 0 && (
+                        <p className="text-sm font-medium text-yellow-400">
+                          💰 Save {formatCurrency(insight.potentialSavings)} per {insight.timeframe}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -525,33 +595,44 @@ export default function HomePage() {
 
         {/* Recent Transactions */}
         {recentTransactions.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Recent Transactions</h3>
-              <Link href="/transactions" className="text-sm text-blue-600 hover:text-blue-800">
-                View All
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white">Recent Transactions</h3>
+              </div>
+              <Link 
+                href="/transactions" 
+                className="btn-secondary text-sm inline-flex items-center space-x-2"
+              >
+                <span>View All</span>
+                <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
             <div className="space-y-3">
               {recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                      <span className="text-sm">{getCategoryIcon(getEffectiveCategory(transaction))}</span>
+                <div key={transaction.id} className="glass-card p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gray-500/20 rounded-xl flex items-center justify-center">
+                        {getCategoryIcon(getEffectiveCategory(transaction))}
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">
+                          {getEffectiveCategory(transaction)}
+                        </p>
+                        <p className="text-sm text-gray-400">
+                          {new Date(transaction.date).toLocaleDateString('da-DK')}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900 text-sm">
-                        {getEffectiveCategory(transaction)}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(transaction.date).toLocaleDateString('da-DK')}
+                    <div className="text-right">
+                      <p className={`font-semibold ${getTransactionColor(transaction.amount)}`}>
+                        {formatCurrency(transaction.amount)}
                       </p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`font-semibold text-sm ${getTransactionColor(transaction.amount)}`}>
-                      {formatCurrency(transaction.amount)}
-                    </p>
                   </div>
                 </div>
               ))}
@@ -561,24 +642,35 @@ export default function HomePage() {
 
         {/* Recent Achievements */}
         {achievements.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Recent Achievements</h3>
-              <Link href="/achievements" className="text-sm text-blue-600 hover:text-blue-800">
-                View All
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center">
+                  <Award className="w-5 h-5 text-orange-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white">Recent Achievements</h3>
+              </div>
+              <Link 
+                href="/achievements" 
+                className="btn-secondary text-sm inline-flex items-center space-x-2"
+              >
+                <span>View All</span>
+                <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
             <div className="space-y-3">
               {achievements.map((achievement) => (
-                <div key={achievement.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="text-2xl">{achievement.icon}</div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 text-sm">{achievement.name}</p>
-                    <p className="text-xs text-gray-600">{achievement.description}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-medium text-blue-600">+{achievement.points} pts</p>
-                    <p className="text-xs text-gray-500">{achievement.rarity}</p>
+                <div key={achievement.id} className="glass-card p-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="text-3xl">{achievement.icon}</div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-white">{achievement.name}</p>
+                      <p className="text-sm text-gray-400">{achievement.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-orange-400">+{achievement.points} pts</p>
+                      <p className="text-xs text-gray-500">{achievement.rarity}</p>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -587,51 +679,56 @@ export default function HomePage() {
         )}
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-4">
+        <div className="glass-card p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center">
+              <Zap className="w-5 h-5 text-indigo-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-white">Quick Actions</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Link
               href="/budgets?add=true"
-              className="flex items-center space-x-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+              className="glass-card p-4 hover:bg-white/10 transition-all duration-300 group"
             >
-              <span className="text-2xl">🎯</span>
-              <div>
-                <p className="font-medium text-gray-900 text-sm">Create Budget</p>
-                <p className="text-xs text-gray-600">Set spending limits</p>
+              <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                <Target className="w-6 h-6 text-blue-400" />
               </div>
+              <p className="font-semibold text-white text-sm">Create Budget</p>
+              <p className="text-xs text-gray-400">Set spending limits</p>
             </Link>
             
             <Link
               href="/goals?add=true"
-              className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+              className="glass-card p-4 hover:bg-white/10 transition-all duration-300 group"
             >
-              <span className="text-2xl">🏆</span>
-              <div>
-                <p className="font-medium text-gray-900 text-sm">Set Goal</p>
-                <p className="text-xs text-gray-600">Save for something</p>
+              <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                <Trophy className="w-6 h-6 text-green-400" />
               </div>
+              <p className="font-semibold text-white text-sm">Set Goal</p>
+              <p className="text-xs text-gray-400">Save for something</p>
             </Link>
             
             <Link
               href="/subscriptions"
-              className="flex items-center space-x-3 p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+              className="glass-card p-4 hover:bg-white/10 transition-all duration-300 group"
             >
-              <span className="text-2xl">📺</span>
-              <div>
-                <p className="font-medium text-gray-900 text-sm">Subscriptions</p>
-                <p className="text-xs text-gray-600">Manage recurring</p>
+              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                <Calendar className="w-6 h-6 text-purple-400" />
               </div>
+              <p className="font-semibold text-white text-sm">Subscriptions</p>
+              <p className="text-xs text-gray-400">Manage recurring</p>
             </Link>
             
             <Link
               href="/insights"
-              className="flex items-center space-x-3 p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
+              className="glass-card p-4 hover:bg-white/10 transition-all duration-300 group"
             >
-              <span className="text-2xl">🤖</span>
-              <div>
-                <p className="font-medium text-gray-900 text-sm">AI Insights</p>
-                <p className="text-xs text-gray-600">Get recommendations</p>
+              <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                <Brain className="w-6 h-6 text-yellow-400" />
               </div>
+              <p className="font-semibold text-white text-sm">AI Insights</p>
+              <p className="text-xs text-gray-400">Get recommendations</p>
             </Link>
           </div>
         </div>
