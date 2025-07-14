@@ -12,7 +12,10 @@ export async function GET(request: NextRequest) {
     }
 
     const categories = await DatabaseService.getAvailableCategories(userId);
-    return NextResponse.json({ categories });
+    return NextResponse.json({ 
+      success: true,
+      categories 
+    });
   } catch (error) {
     console.error('Error fetching available categories:', error);
     return NextResponse.json(

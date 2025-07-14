@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/supabase';
+import { analyzeSpendingHabits } from '@/lib/openai';
+
+interface InsightData {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  potentialSavings: number;
+  timeframe: string;
+  priority: string;
+  category?: string;
+  confidence: number;
+  created_at: string;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,50 +28,101 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // For now, return mock insights since we don't have actual AI processing
-    const mockInsights = [
-      {
-        id: '1',
-        type: 'savings_opportunity',
-        title: 'Reduce Coffee Shop Spending',
-        description: 'You spent 15% more on coffee shops this month compared to last month. Consider brewing coffee at home to save money.',
-        potentialSavings: 320,
-        timeframe: 'monthly',
-        priority: 'medium',
-        category: 'Dining',
-        confidence: 85,
-        created_at: new Date().toISOString()
-      },
-      {
-        id: '2',
-        type: 'spending_pattern',
-        title: 'Weekend Spending Spike',
-        description: 'Your spending increases by 40% on weekends. Most of this is entertainment and dining expenses.',
-        timeframe: 'weekly',
-        priority: 'low',
-        category: 'Entertainment',
-        confidence: 92,
-        created_at: new Date().toISOString()
-      },
-      {
-        id: '3',
-        type: 'goal_recommendation',
-        title: 'Emergency Fund Goal',
-        description: 'Based on your monthly expenses, you should aim to save at least 15,000 DKK for an emergency fund.',
-        potentialSavings: 15000,
-        timeframe: 'yearly',
-        priority: 'high',
-        confidence: 95,
-        created_at: new Date().toISOString()
-      }
-    ];
+    // Get user's transactions for AI analysis
+    const transactions = await DatabaseService.getTransactions(userId, 100);
+    
+    if (!transactions || transactions.length === 0) {
+      return NextResponse.json({
+        success: true,
+        insights: [],
+        count: 0,
+        message: 'No transactions found for analysis'
+      });
+    }
 
-    const limitedInsights = limit ? mockInsights.slice(0, parseInt(limit)) : mockInsights;
+    // Generate AI insights using OpenAI
+    const aiAnalysis = await analyzeSpendingHabits(transactions);
+    
+    // Convert AI analysis to insight format
+    const insights: InsightData[] = [];
+    
+    // Add insights from AI analysis
+    if (aiAnalysis.insights) {
+      aiAnalysis.insights.forEach((insight: any, index: number) => {
+        insights.push({
+          id: `ai-${index}`,
+          type: insight.type || 'spending_pattern',
+          title: insight.title,
+          description: insight.description,
+          potentialSavings: insight.potentialSavings || 0,
+          timeframe: insight.timeframe || 'monthly',
+          priority: insight.priority || 'medium',
+          category: insight.category,
+          confidence: 85,
+          created_at: new Date().toISOString()
+        });
+      });
+    }
+
+    // Add recommendations as insights
+    if (aiAnalysis.recommendations) {
+      aiAnalysis.recommendations.forEach((rec: any, index: number) => {
+        insights.push({
+          id: `rec-${index}`,
+          type: 'savings_opportunity',
+          title: `Optimize ${rec.category}`,
+          description: rec.suggestion,
+          potentialSavings: rec.savingsEstimate || 0,
+          timeframe: 'monthly',
+          priority: rec.impact || 'medium',
+          category: rec.category,
+          confidence: 80,
+          created_at: new Date().toISOString()
+        });
+      });
+    }
+
+    // Generate additional insights from stored database insights
+    try {
+      const dbInsights = await DatabaseService.generateFinancialInsights(userId);
+      dbInsights.forEach((insight: any, index: number) => {
+        insights.push({
+          id: `db-${index}`,
+          type: insight.insight_type,
+          title: insight.title,
+          description: insight.description,
+          potentialSavings: insight.potential_savings || 0,
+          timeframe: 'monthly',
+          priority: insight.priority,
+          category: insight.category,
+          confidence: Math.round(insight.confidence_score * 100),
+          created_at: insight.created_at
+        });
+      });
+    } catch (dbError) {
+      console.warn('Could not generate database insights:', dbError);
+    }
+
+    // Sort insights by priority and potential savings
+    insights.sort((a, b) => {
+      const priorityOrder = { high: 3, medium: 2, low: 1 };
+      const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
+      const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
+      
+      if (aPriority !== bPriority) {
+        return bPriority - aPriority;
+      }
+      
+      return (b.potentialSavings || 0) - (a.potentialSavings || 0);
+    });
+
+    const limitedInsights = limit ? insights.slice(0, parseInt(limit)) : insights;
 
     return NextResponse.json({
       success: true,
       insights: limitedInsights,
-      count: limitedInsights.length
+      count: limitedInsights.length,
+      totalSavingsPotential: insights.reduce((sum, insight) => sum + (insight.potentialSavings || 0), 0)
     });
 
   } catch (error) {

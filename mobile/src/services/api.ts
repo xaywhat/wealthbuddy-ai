@@ -71,7 +71,7 @@ export const transactionsAPI = {
 export const budgetsAPI = {
   getBudgets: async (userId: string) => {
     const response = await api.get(`/api/budgets?userId=${userId}`);
-    return response.data.budgets || response.data;
+    return response.data.budgets || [];
   },
   
   createBudget: async (userId: string, budget: Partial<Budget>) => {
@@ -89,7 +89,7 @@ export const budgetsAPI = {
 export const goalsAPI = {
   getGoals: async (userId: string) => {
     const response = await api.get(`/api/goals?userId=${userId}`);
-    return response.data.goals || response.data;
+    return response.data.goals || [];
   },
   
   createGoal: async (userId: string, goal: Partial<Goal>) => {
